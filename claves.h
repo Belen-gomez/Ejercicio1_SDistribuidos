@@ -1,24 +1,5 @@
-#define MAXSIZE	256
-#define INIT 0
-#define SET 1
-#define GET 2
-#define MODIFY 3
-#define DELETE 4
-#define EXIST 5
-
 #ifndef CLAVES_H
 #define CLAVES_H
-
-
-
-struct peticion{
-    int op;
-    int clave;
-    char valor1;
-    int N;
-    double valor2[32];      /* Esto hay que hacerlo con memoria dinamica */
-    char q_name[MAXSIZE]; 	/* nombre de la cola cliente donde debe enviar la respuesta 	*/
-};
 
 
 /**
@@ -29,6 +10,7 @@ struct peticion{
  * @retval 0 en caso de exito.
  * @retval -1 en caso de error.
  */
+
 int init();
 
 /**
@@ -48,7 +30,7 @@ int init();
  * @retval 0 si se insertó con éxito.
  * @retval -1 en caso de error.
  */
-int set_value(int key, char *value1, int N_value2, double *V_value2);
+int set_value(int key,char *value1, int N_value2, double *V_value2);
 
 /**
  * @brief Este servicio permite obtener los valores asociados a la clave key. La cadena de caracteres

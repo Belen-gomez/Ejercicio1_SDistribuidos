@@ -1,18 +1,20 @@
 BIN_FILES  = servidor cliente
+LIB_FILE = libclaves.so
 
 CC = gcc
 
-CPPFLAGS = -I$(INSTALL_PATH)/include -Wall
 
+CPPFLAGS = -I$(INSTALL_PATH)/include -Wall
 LDFLAGS = -L$(INSTALL_PATH)/lib/
 LDLIBS = -lpthread -lrt
 
+all: $(BIN_FILES) $(LIB_FILE)
 
-cliente: cliente.o $(LIB_FILE)
+cliente: cliente.o claves.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 	chmod +x $@
 
-servidor: servidor.o $(LIB_FILE)
+servidor: servidor.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 	chmod +x $@
 
@@ -28,4 +30,4 @@ servidor.o: servidor.c
 clean:
 	rm -f $(BIN_FILES) $(LIB_FILE) *.o
 
-.PHONY: clean
+.PHONY: all clean
