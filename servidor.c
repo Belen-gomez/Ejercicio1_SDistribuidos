@@ -8,6 +8,7 @@
 
 pthread_mutex_t mutex;
 pthread_cond_t cond;
+int mensaje_no_copiado = 1;
 mqd_t q_servidor;     	   
 mqd_t q_cliente;  
 
@@ -15,7 +16,7 @@ mqd_t q_cliente;
 List lista; // Lista enlazada para almacenar las tuplas
 
 int init(List *l) {
-    pthread_mutex_lock(&mutex);
+    // Eliminar todas las tuplas almacenadas previamente
 
     *l = NULL;
     // Eliminar todas las tuplas almacenadas previamente
@@ -27,8 +28,6 @@ int init(List *l) {
         free(temp);
     }
     lista = NULL; // Reiniciar la lista*/
-
-    pthread_mutex_unlock(&mutex);
     return 0; // Éxito
 }
 
@@ -56,30 +55,40 @@ int set_value(List *l, int clave, char *valor1, int N, double *valor2){
 		ptr->siguiente = *l;
 		*l= ptr;
 	}
-    
 
 	return 0;
 }
 
   
 
-int atender_peticion(struct peticion *pet){
+int atender_peticion(void *pet){
+    struct peticion peticion;	/* mensaje local */
+    pthread_mutex_lock(&mutex);
+
+	peticion = (*(struct peticion *) pet);
+
+	/* ya se puede despertar al servidor*/
+	mensaje_no_copiado = 0;
+
+	pthread_cond_signal(&cond);
+
+	pthread_mutex_unlock(&mutex);
     int res;
-    if (pet->op == INIT)   
+    if (peticion.op == INIT)   
         res = init(&lista);
-    else if (pet->op == 1){
-        set_value(&lista, pet->clave, pet->valor1, pet->N, pet->valor2);
+    else if (peticion.op == 1){
+        res = set_value(&lista, peticion.clave, peticion.valor1, peticion.N, peticion.valor2);
     }
-    else if (pet->op == 2){
+    else if (peticion.op == 2){
         //get_value(pet->clave, pet->valor1, pet->N, pet->valor2);
     }
-    else if (pet->op == 3){
+    else if (peticion.op == 3){
         //modify_value(pet->clave, pet->valor1, pet->N, pet->valor2);
     }
-    else if (pet->op == 4){
+    else if (peticion.op == 4){
         //delete_key(pet->clave);
     }
-    else if (pet->op == 5){
+    else if (peticion.op == 5){
         //exist(pet->clave);
     }   
     else{
@@ -88,7 +97,7 @@ int atender_peticion(struct peticion *pet){
     } 
 
     /* se responde al cliente abriendo reviamente su cola */
-    q_cliente = mq_open(pet->q_name, O_WRONLY);
+    q_cliente = mq_open(peticion.q_name, O_WRONLY);
     if (q_cliente < 0) {
         perror("mq_open 2");
         mq_close(q_servidor);
@@ -105,11 +114,13 @@ int atender_peticion(struct peticion *pet){
         
     }
 
-    mq_close(q_cliente);
+    //mq_close(q_cliente);
+    pthread_exit(0);
     return 0;
 }
 
-int main(){
+int main(void){
+    printf("servidor1");
     pthread_t hilo;
     pthread_attr_t t_attr;		// atributos de los threads
 
@@ -138,9 +149,13 @@ int main(){
             return -1;
         }
 
-        if(pthread_create(&hilo, &t_attr, (void *) &atender_peticion, (void *) &pet) == -1){
-            perror("pthread_create");
-            return -1;
+        if(pthread_create(&hilo, &t_attr, (void *) &atender_peticion, (void *) &pet) == 0){
+            pthread_mutex_lock(&mutex);
+			while (mensaje_no_copiado)
+				pthread_cond_wait(&cond, &mutex);
+			mensaje_no_copiado = 1;
+			pthread_mutex_unlock(&mutex);
+	 	   
         }
 
 
@@ -148,3 +163,7 @@ int main(){
     }
     return 0;
 }
+
+
+
+

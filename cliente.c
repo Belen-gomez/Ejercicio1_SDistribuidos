@@ -4,7 +4,6 @@
 #include <stdlib.h>
 
 int main(){
-    printf("hola");
     if (init() ==0){
         printf("hola");
     }
@@ -13,6 +12,8 @@ int main(){
     // Supongamos que tienes un vector de dobles con 3 elementos
     int N_value2 = 1;
     double vector[] = {1.5};
-    set_value(1, cadena,  N_value2, vector);
+    if(set_value(1, cadena,  N_value2, vector) == 0){
+        printf("hola");
+    }
     return 0;
 }

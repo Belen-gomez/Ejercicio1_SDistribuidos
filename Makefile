@@ -20,10 +20,7 @@ servidor: servidor.o
 
 $(LIB_FILE): claves.o
 	$(CC) $(LDFLAGS) -shared $^ -o $@
-
-servidor.o: servidor.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
+	
 %.o: %.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fPIC -c $< -o $@
 

@@ -55,6 +55,7 @@ void tratar_mensaje(void  *mess){
 
 
 int main(void) {
+	printf("Servidor de operaciones\n");
         struct peticion mess;     
         struct mq_attr attr;
 	pthread_attr_t t_attr;		// atributos de los threads 
