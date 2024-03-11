@@ -7,6 +7,7 @@
 
 
 int init(){
+	
     mqd_t q_servidor;       /* cola de mensajes del proceso servidor */
 	mqd_t q_cliente;        /* cola de mensajes para el proceso cliente */
 
@@ -30,26 +31,25 @@ int init(){
 	pet.op = 0;
 
 	strcpy(pet.q_name, "/100472037");
+	printf("enviar");
 	if (mq_send(q_servidor, (const char *)&pet, sizeof(pet), 0) < 0) {
 		perror("mq_send");
-		mq_close(q_servidor);
-		mq_close(q_cliente);
 		return -1;
 	}
+	
 	if (mq_receive(q_cliente, (char *)&res, sizeof(int), 0) < 0) {
 		perror("mq_receive");
-		mq_close(q_servidor);
-		mq_close(q_cliente);
 		return -1;
 	}
+	printf("recibir");
 	mq_close(q_servidor);
-	//mq_close(q_cliente);
-	//mq_unlink(q_servidor);
-	return 0;
+	mq_close(q_cliente);
+	mq_unlink("/100472037");
+	return res;
 
 }
 
-int set_value(int key, char *value1, int N_value2, double *V_value2){
+int set_value(int key, char *value1){
 	mqd_t q_servidor;       
 	mqd_t q_cliente;        
 
@@ -75,13 +75,14 @@ int set_value(int key, char *value1, int N_value2, double *V_value2){
 	pet.op = 1;
 	pet.clave = key;
 	pet.valor1 = value1;
+    printf(pet.valor1);
 	//strcpy(pet.valor1, value1);
-	pet.N = N_value2;
-	pet.valor2 = V_value2;
+	//pet.N = N_value2;
+	//pet.valor2 = V_value2;
 	//strcpy(pet.valor2, V_value2);
 	strcpy(pet.q_name, "/100472037");
 
-	if (mq_send(q_servidor, (const char *)&pet, sizeof(pet), 0) < 0) {
+	if (mq_send(q_servidor, (char *)&pet, sizeof(pet), 0) < 0) {
 		perror("mq_send");
 		mq_close(q_servidor);
 		mq_close(q_cliente);
@@ -94,8 +95,8 @@ int set_value(int key, char *value1, int N_value2, double *V_value2){
 		return -1;
 	}
 	mq_close(q_servidor);
-	//mq_close(q_cliente);
-	//mq_unlink(q_servidor);
+	mq_close(q_cliente);
+	mq_unlink("/100472037");
 	return 0;
 }
 
