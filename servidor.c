@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <string.h>
-#include <stdlib.h>
 
 pthread_mutex_t mutex;
 pthread_cond_t cond;
@@ -16,6 +15,7 @@ mqd_t q_cliente =0;
 List lista; // Lista enlazada para almacenar las tuplas
 
 int init() {
+
     // Abrir el archivo en modo de escritura, que borrará el contenido existente
     FILE *archivo = fopen("base.txt", "w");
     if (archivo == NULL) {
@@ -28,24 +28,22 @@ int init() {
     return 0;
 }
 
-int set_value(int clave, char *valor1){
+int set_value(int clave, char *valor1, int N, double *valor2){
+
     FILE *archivo = fopen("base.txt", "a"); // Abrir el archivo en modo de escritura "a" (append)
     if (archivo == NULL) {
         printf("No se pudo abrir el archivo.\n");
         return -1;
     }
-
-
     fprintf(archivo, "<%d, [%s], ", clave, valor1);
 
-    //fprintf(archivo, "%s\n", valor1);
-    /*for (int i = 0; i < N; i++) {
+    for (int i = 0; i < N; i++) {
         fprintf(archivo, "%f", valor2[i]);
         if (i < N - 1) {
             fprintf(archivo, ", ");
         }
-    }*/
-    //fprintf(archivo, "]>\n");
+    }
+    fprintf(archivo, "]>\n");
 
     fclose(archivo);
     return 0;
@@ -67,8 +65,7 @@ void atender_peticion(struct peticion *pet){
     if (peticion.op == INIT)
         res = init();
     else if (peticion.op == 1){
-
-        res = set_value(peticion.clave, peticion.valor1);
+        res = set_value(peticion.clave, peticion.valor1, peticion.N, peticion.valor2);
     }
     else if (peticion.op == 2){
         //get_value(pet->clave, pet->valor1, pet->N, pet->valor2);
@@ -92,13 +89,13 @@ void atender_peticion(struct peticion *pet){
     if (q_cliente < 0) {
         perror("mq_open 2");
         mq_close(q_servidor);
-        mq_unlink("/SERVIDOR");
+        mq_unlink("/100472037");
     }
     else{
         if (mq_send(q_cliente, (const char *)&res, sizeof(int), 0) < 0) {
         perror("mq_send");
         mq_close(q_servidor);
-        mq_unlink("/SERVIDOR");
+        mq_unlink("/100472037");
         mq_close(q_cliente);
         }
     }
@@ -118,7 +115,7 @@ int main(){
     attr.mq_maxmsg = 10;
 	attr.mq_msgsize = sizeof(struct peticion);
 
-    q_servidor = mq_open("/SERVIDOR", O_CREAT|O_RDONLY, 0700, &attr);
+    q_servidor = mq_open("/100472037", O_CREAT|O_RDONLY, 0700, &attr);
     if (q_servidor == -1) {
 		perror("mq_open 1");
 		return -1;
@@ -128,12 +125,14 @@ int main(){
     pthread_cond_init(&cond, NULL);
     pthread_attr_init(&t_attr);
 
-	// atributos de los threads, threads independientes
+	//atributos de los threads, threads independientes
 	pthread_attr_setdetachstate(&t_attr, PTHREAD_CREATE_DETACHED);
 
     while(1) {
 
         if (mq_receive(q_servidor, (char *) &pet, sizeof(pet), 0) < 0){
+            mq_close(q_servidor);
+            mq_unlink("/100472037");
             perror("mq_recev");
             return -1;
         }
