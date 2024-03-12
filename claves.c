@@ -21,8 +21,9 @@ int init(){
 		perror("mq_open");
 		return -1;
 	}
-
-    q_servidor = mq_open("/SERVIDOR", O_WRONLY);
+    struct mq_attr attr_s;
+    attr_s.mq_msgsize = sizeof(struct peticion) + 10;
+    q_servidor = mq_open("/SERVIDOR", O_WRONLY, &attr_s);
 	if (q_servidor == -1){
 		mq_close(q_cliente);
 		perror("mq_open");
@@ -31,9 +32,9 @@ int init(){
 	pet.op = 0;
 
 	strcpy(pet.q_name, "/100472037");
-	printf("enviar");
-	if (mq_send(q_servidor, (const char *)&pet, sizeof(pet), 0) < 0) {
-		perror("mq_send");
+
+	if (mq_send(q_servidor, (char *)&pet, sizeof(struct peticion), 0) < 0) {
+		perror("mq_send 1");
 		return -1;
 	}
 	
@@ -74,9 +75,8 @@ int set_value(int key, char *value1){
 	}
 	pet.op = 1;
 	pet.clave = key;
-	pet.valor1 = value1;
-    printf(pet.valor1);
-	//strcpy(pet.valor1, value1);
+    strcpy(pet.valor1, value1);
+
 	//pet.N = N_value2;
 	//pet.valor2 = V_value2;
 	//strcpy(pet.valor2, V_value2);

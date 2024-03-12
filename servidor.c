@@ -10,7 +10,7 @@ pthread_mutex_t mutex;
 pthread_cond_t cond;
 int mensaje_no_copiado = 1;
 mqd_t q_servidor;
-mqd_t q_cliente;
+mqd_t q_cliente =0;
 
 
 List lista; // Lista enlazada para almacenar las tuplas
@@ -34,15 +34,11 @@ int set_value(int clave, char *valor1){
         printf("No se pudo abrir el archivo.\n");
         return -1;
     }
-    // Verificar si valor1 es válido antes de usarlo
-    if (valor1 == NULL) {
-        printf("Error: valor1 no apunta a una cadena de caracteres válida.\n");
-        fclose(archivo);
-        return -1;
-    }
-    // Escribir la tupla en el archivo en el formato deseado
-    fprintf(archivo, "<%d, [", clave);
-    fprintf( archivo, valor1);
+
+
+    fprintf(archivo, "<%d, [%s], ", clave, valor1);
+
+    //fprintf(archivo, "%s\n", valor1);
     /*for (int i = 0; i < N; i++) {
         fprintf(archivo, "%f", valor2[i]);
         if (i < N - 1) {
@@ -56,26 +52,23 @@ int set_value(int clave, char *valor1){
 }
 
 
-void atender_peticion(void *pet){
+void atender_peticion(struct peticion *pet){
 
     struct peticion peticion;
     pthread_mutex_lock(&mutex);
-    printf("atender");
-	peticion = (*(struct peticion *) pet);
-
-
-	mensaje_no_copiado = 0;
+    peticion = *pet;
+    mensaje_no_copiado = 0;
 
 	pthread_cond_signal(&cond);
 
 	pthread_mutex_unlock(&mutex);
+
     int res;
     if (peticion.op == INIT)
         res = init();
     else if (peticion.op == 1){
 
         res = set_value(peticion.clave, peticion.valor1);
-        //res = getLength(lista);
     }
     else if (peticion.op == 2){
         //get_value(pet->clave, pet->valor1, pet->N, pet->valor2);
@@ -94,6 +87,7 @@ void atender_peticion(void *pet){
     }
 
     //se responde al cliente abriendo reviamente su cola
+
     q_cliente = mq_open(peticion.q_name, O_WRONLY);
     if (q_cliente < 0) {
         perror("mq_open 2");

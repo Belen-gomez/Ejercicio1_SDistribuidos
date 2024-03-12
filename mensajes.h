@@ -9,7 +9,7 @@
 struct peticion{
     int op;
     int clave;
-    char *valor1;
+    char valor1[256];
     int N;
     double *valor2;      /* Esto hay que hacerlo con memoria dinamica */
     char q_name[MAXSIZE]; 	/* nombre de la cola cliente donde debe enviar la respuesta 	*/

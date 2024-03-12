@@ -8,7 +8,7 @@ int main(){
         printf("hola");
     }
 
-    char *cadena = "Hola mundo";
+    char cadena[256] = "Hola mundo";
 
     // Supongamos que tienes un vector de dobles con 3 elementos
     int N_value2 = 1;
