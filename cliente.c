@@ -12,7 +12,7 @@ int main(){
 
     // Supongamos que tienes un vector de dobles con 3 elementos
     int N_value2 = 2;
-    double vector[] = {1.5, 3.2};
+    double vector[] = {1.5, 2.2};
     if(set_value(1, cadena, N_value2, vector) == 0){
         printf("hola2");
     }

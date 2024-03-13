@@ -35,7 +35,7 @@ int set_value(int clave, char *valor1, int N, double *valor2){
         printf("No se pudo abrir el archivo.\n");
         return -1;
     }
-    fprintf(archivo, "<%d, [%s], ", clave, valor1);
+    fprintf(archivo, "<%d, [%s], [", clave, valor1);
 
     for (int i = 0; i < N; i++) {
         fprintf(archivo, "%f", valor2[i]);
@@ -114,7 +114,7 @@ int main(){
 
     attr.mq_maxmsg = 10;
 	attr.mq_msgsize = sizeof(struct peticion);
-
+    printf("Tamaño de la estructura peticion: %zu bytes\n", sizeof(struct peticion) + 100);
     q_servidor = mq_open("/100472037", O_CREAT|O_RDONLY, 0700, &attr);
     if (q_servidor == -1) {
 		perror("mq_open 1");

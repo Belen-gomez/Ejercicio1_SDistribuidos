@@ -22,8 +22,7 @@ int init(){
 		perror("mq_open");
 		return -1;
 	}
-    struct mq_attr attr_s;
-    attr_s.mq_msgsize = sizeof(struct peticion) +1000;
+
     q_servidor = mq_open("/100472037", O_WRONLY);
 	if (q_servidor == -1){
 		mq_close(q_cliente);
@@ -77,10 +76,10 @@ int set_value(int key,char *value1, int N_value, double *V_value2){
 	}
 
 	struct mq_attr attr_s;
-	attr_s.mq_maxmsg = 10;                
+	attr_s.mq_maxmsg = 10;
 	attr_s.mq_msgsize = sizeof(struct peticion);
 
-    q_servidor = mq_open(queuename, O_WRONLY, 0700);
+    q_servidor = mq_open("/100472037", O_WRONLY);
 	if (q_servidor == -1){
 		mq_close(q_cliente);
 		perror("mq_open");
@@ -91,15 +90,16 @@ int set_value(int key,char *value1, int N_value, double *V_value2){
     strcpy(pet.valor1, value1);
     pet.N = N_value;
 
-    for (int i = 0; i< N_value -1; i++){
+    for (int i = 0; i< N_value; i++){
         pet.valor2[i] = V_value2[i];
+        printf("%f", pet.valor2[i]);
     }
 	strcpy(pet.q_name, queuename);
 
     printf("Tamaño de la estructura peticion: %zu bytes\n", sizeof(pet));
     printf("Tamaño de la estructura peticion: %zu bytes\n", sizeof(struct peticion));
-	if (mq_send(q_servidor, (char *)&pet, sizeof(struct peticion), 0) < 0) {
-		perror("mq_send");
+	if (mq_send(q_servidor, (const char *)&pet, sizeof(struct peticion), 0) < 0) {
+		perror("mq_send 3");
 		mq_close(q_servidor);
 		mq_close(q_cliente);
         mq_unlink(queuename);

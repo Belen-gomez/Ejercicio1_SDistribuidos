@@ -9,7 +9,7 @@ int main(void) {
         struct mq_attr attr;
 
         attr.mq_maxmsg = 10;                
-	attr.mq_msgsize = sizeof(struct peticion);
+	    attr.mq_msgsize = sizeof(struct peticion);
         q_servidor = mq_open("/SERVIDOR_SUMA", O_CREAT|O_RDONLY, 0700, &attr);
 	if (q_servidor == -1) {
 		perror("mq_open");
