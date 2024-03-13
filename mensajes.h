@@ -14,3 +14,11 @@ struct peticion{
     double valor2[32];      /* Esto hay que hacerlo con memoria dinamica */
     char q_name[MAXSIZE]; 	/* nombre de la cola cliente donde debe enviar la respuesta 	*/
 };
+
+struct respuesta{
+    int status;
+    int clave;
+    char valor1[256];
+    int N;
+    double valor2[32];      /* Esto hay que hacerlo con memoria dinamica */
+};
