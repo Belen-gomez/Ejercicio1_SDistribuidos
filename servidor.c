@@ -17,171 +17,165 @@ struct respuesta res;
 
 List lista; // Lista enlazada para almacenar las tuplas
 
-int init() {
+int init(List *l) {
 
-    // Abrir el archivo en modo de escritura, que borrará el contenido existente
-    FILE *archivo = fopen("base.txt", "w");
-    if (archivo == NULL) {
-        printf("No se pudo abrir el archivo.\n");
-        return -1;
-    }
-
-    // Cerrar el archivo
-    fclose(archivo);
+    *l = NULL;
     return 0;
 }
 
-int set_value(int clave, char *valor1, int N, double *valor2){
 
-    FILE *archivo_leer = fopen("base.txt", "r"); // Abrir el archivo en modo de lectura
-    if (archivo_leer == NULL) {
-        printf("No se pudo abrir el archivo.\n");
-        return -1;
-    }
-
-    char *linea = NULL;
-    size_t longitud = 0;
-
-    while (getline(&linea, &longitud, archivo_leer) != -1) {
-        int clave_actual;
-        // Intentar extraer la clave de la línea
-        if (sscanf(linea, "%d,", &clave_actual) == 1) {
-            // Verificar si la clave actual es igual a la clave nueva
-            if (clave_actual == clave) {
-                // Cerrar el archivo y liberar la memoria de la línea
-                fclose(archivo_leer);
-                perror("Se ha intentado insertar una tupla con una clave repetido");
-                free(linea);
-                return -1; // Clave encontrada
-            }
+int set_value(List *l, int clave, char *valor1, int N, double *valor2){
+    // Verificar si la clave ya existe en la lista
+    List aux = *l;
+    while (aux != NULL) {
+        if (aux->clave == clave) {
+            printf("Error: Ya existe un elemento con la clave %d\n", clave);
+            return -1; // Clave duplicada, retorna error
         }
+        aux = aux->siguiente;
     }
-    fclose(archivo_leer);
-    free(linea); // Liberar la memoria asignada por getline
+    struct Tupla *ptr;
 
-    FILE *archivo = fopen("base.txt", "a"); // Abrir el archivo en modo de escritura "a" (append)
-    if (archivo == NULL) {
-        printf("No se pudo abrir el archivo.\n");
+    ptr = (struct Tupla *) malloc(sizeof(struct Tupla));
+    if (ptr == NULL) 
         return -1;
-    }
-    fprintf(archivo, "%d,%s,", clave, valor1);
 
-    for (int i = 0; i < N; i++) {
-        fprintf(archivo, "%f", valor2[i]);
-        if (i < N - 1) {
-            fprintf(archivo, ",");
+    ptr->clave = clave;
+    strcpy(ptr->valor1, valor1);
+    ptr->N = N;
+    ptr->valor2 = malloc(N * sizeof(double));
+    for(int i = 0; i < N; i++){
+        ptr->valor2[i] = valor2[i];
+    }
+    ptr->siguiente = *l;
+    *l = ptr;
+
+
+	return 0;
+}
+
+int printList(List l) {
+    List aux = l;
+    printf("Imprimir\n");
+    while(aux != NULL){
+        printf("Nueva tupla\n");
+        printf("Clave=%d    value1=%s   N=%d\n", aux->clave, aux->valor1, aux->N);
+        printf("Valor2:");
+        for(int i = 0; i < aux->N; i++){
+            printf(" %.6f", aux->valor2[i]); // Imprimir valor2[i] con 6 decimales de precisión
         }
+        printf("\n\n"); // Agregar una línea en blanco después de cada tupla
+        aux = aux->siguiente;
     }
-    fprintf(archivo, "\n");
-
-    fclose(archivo);
     return 0;
 }
 
- int get_value(int clave){
-    FILE *archivo = fopen("base.txt", "r"); // Abrir el archivo en modo de lectura
-    if (archivo == NULL) {
-        printf("No se pudo abrir el archivo.\n");
+ int get_value(List *l, int clave){
+    if (*l == NULL) {
+        perror("La lista está vacía");
         return -1;
     }
-
-    char *linea = NULL;
-    size_t longitud = 0;
-    
-    while (getline(&linea, &longitud, archivo) != -1) {
-        int clave_actual;
-        
-        // Intentar extraer la clave de la línea
-        if (sscanf(linea, "%d,", &clave_actual) == 1) {
+    // Buscar la tupla con la clave especificada
+    List aux = *l;
+    while (aux != NULL) {
+        if (aux->clave == clave) {
             
-            // Verificar si la clave actual es igual a la clave nueva
-            if (clave_actual == clave) {
-                
-                // Extraer el valor 1
-                char valor1[MAXSIZE];
-                sscanf(linea, "%d,%[^,],", &clave_actual, valor1);
-                res.clave = clave_actual;
-                strcpy(res.valor1, valor1);
-
-                // Extraer el valor 2
-                int N = 0;
-                double valor2[32];
-                char *token = strtok(linea, ",");
-                while (token != NULL) {
-                    if (N > 1) {
-                        sscanf(token, "%lf", &valor2[N - 2]);
-                    }
-                    token = strtok(NULL, ",");
-                    N++;
-                }
-                res.N = N - 2;
-                for (int i = 0; i < N - 2; i++) {
-                    res.valor2[i] = valor2[i];
-                }
-                fclose(archivo);
-                free(linea);
-                return 0; // Clave encontrada
+            // Se encontró la clave, copiar los valores a la estructura de respuesta
+            res.clave = aux->clave;
+            strcpy(res.valor1, aux->valor1);
+            res.N = aux->N;
+            for (int i = 0; i < res.N; i++) {
+                res.valor2[i] = aux->valor2[i];
             }
+            return 0;
         }
+        aux = aux->siguiente;
     }
-    fclose(archivo);
-    free(linea); // Liberar la memoria asignada por getline
-    perror("No se ha encontrado la clave");
-    return -1; // Clave no encontrada
+    perror("Se ha intentado acceder a una clave que no existe");
+    return -1;
+
 }
 
-int modify_value(int clave, char *valor1, int N, double *valor2){
-    FILE *archivo = fopen("base.txt", "r+"); // Abrir el archivo en modo de lectura y escritura
-    if (archivo == NULL) {
-        printf("No se pudo abrir el archivo.\n");
+
+int modify_value(List *l, int clave, char *valor1, int N, double *valor2){
+    if (*l == NULL) {
+        perror("La lista está vacía");
+        return -1;
+    }
+    // Buscar la tupla con la clave especificada
+    List aux = *l;
+    while (aux != NULL) {
+        if (aux->clave == clave) {
+            // Se encontró la clave, copiar los valores a la estructura de respuesta
+            aux->clave = clave;
+            strcpy(aux->valor1, valor1);
+            aux->N = N;
+            aux->valor2 = malloc(N * sizeof(double));
+            for(int i = 0; i < N; i++){
+                aux->valor2[i] = valor2[i];
+            }
+            return 0;
+        }
+        aux = aux->siguiente;
+    }
+    perror("Se ha intentado acceder a una clave que no existe");
+    return -1;
+}
+
+int delete_key(List *l, int key) {
+    if (*l == NULL) {
+        perror("La lista está vacía");
         return -1;
     }
 
-    char *linea = NULL;
-    size_t longitud = 0;
-    int clave_actual;
-    long int posicion = -1;
+    List current = *l;
+    List previous = NULL;
 
-    while (getline(&linea, &longitud, archivo) != -1) {
-        // Intentar extraer la clave de la línea
-        if (sscanf(linea, "%d,", &clave_actual) == 1) {
-            // Verificar si la clave actual es igual a la clave buscada
-            if (clave_actual == clave) {
-                posicion = ftell(archivo) - strlen(linea); // Guardar la posición de la línea encontrada
-                break;
-            }
-        }
+    // Buscar el nodo con la clave key
+    while (current != NULL && current->clave != key) {
+        previous = current;
+        current = current->siguiente;
     }
 
-    if (posicion == -1) {
-        fclose(archivo);
-        free(linea);
+    // Si current es NULL, significa que no se encontró la clave
+    if (current == NULL) {
         perror("No se ha encontrado la clave");
-        return -1; // Clave no encontrada
+        return -1;
     }
 
-    // Mover el puntero de lectura/escritura a la posición de la línea encontrada
-    fseek(archivo, posicion, SEEK_SET);
+    // Si previous es NULL, el nodo a eliminar es el primero de la lista
+    if (previous == NULL) {
+        *l = current->siguiente;
+    } else {
+        // El nodo a eliminar está en el medio o al final de la lista
+        previous->siguiente = current->siguiente;
+    }
 
-    // Modificar el valor 1
-    fprintf(archivo, "%d,%s,", clave, valor1);
+    // Liberar la memoria del nodo eliminado
+    free(current->valor2); // Liberar la memoria del arreglo valor2
+    free(current); // Liberar la memoria del nodo
+    return 0; // Operación exitosa
+}
 
-    // Modificar el valor 2
-    for (int i = 0; i < N; i++) {
-        fprintf(archivo, "%f", valor2[i]);
-        if (i < N - 1) {
-            fprintf(archivo, ",");
+int exist(List *l, int clave){
+    if (*l == NULL) {
+        perror("La lista está vacía");
+        return -1;
+    }
+    List aux = *l;
+    while (aux != NULL) {
+        if (aux->clave == clave) {
+            // Se encontró la clave, copiar los valores a la estructura de respuesta
+            return 1;
         }
+        aux = aux->siguiente;
     }
-    fprintf(archivo, "\n");
-
-    fclose(archivo);
-    free(linea);
+    perror("No se encuentra la clave");
     return 0;
 }
 
 void atender_peticion(struct peticion *pet){
-
+    
     struct peticion peticion;
     pthread_mutex_lock(&mutex);
     peticion = *pet;
@@ -191,22 +185,23 @@ void atender_peticion(struct peticion *pet){
 
 	pthread_mutex_unlock(&mutex);
 
-    if (peticion.op == INIT)
-        res.status = init();
-    else if (peticion.op == 1){
-        res.status = set_value(peticion.clave, peticion.valor1, peticion.N, peticion.valor2);
+    if (peticion.op == 0){
+        res.status = init(&lista);
+    }else if (peticion.op == 1){
+        res.status = set_value(&lista, peticion.clave, peticion.valor1, peticion.N, peticion.valor2);
     }
     else if (peticion.op == 2){
-        res.status =get_value(pet->clave);
+        res.status =get_value(&lista, pet->clave);
     }
     else if (peticion.op == 3){
-        res.status = modify_value(pet->clave, pet->valor1, pet->N, pet->valor2);
+        res.status = modify_value(&lista, pet->clave, pet->valor1, pet->N, pet->valor2);
+        
     }
     else if (peticion.op == 4){
-        //delete_key(pet->clave);
+        res.status = delete_key(&lista, pet->clave);
     }
     else if (peticion.op == 5){
-        //exist(pet->clave);
+        res.status = exist(&lista, pet->clave);
     }
     else{
         perror("Operacion no valida");
@@ -218,22 +213,33 @@ void atender_peticion(struct peticion *pet){
     q_cliente = mq_open(peticion.q_name, O_WRONLY);
     if (q_cliente < 0) {
         perror("mq_open 2");
-        mq_close(q_servidor);
-        mq_unlink("/100472037");
+        if(mq_close(q_servidor)==-1){
+            perror("mq_close servidor");
+        }
+        if(mq_unlink("/100472037")==-1){
+            perror("mq_unlink servidor");
+        }
         res.status = -1;
     }
     else{
         if (mq_send(q_cliente, (const char *)&res, sizeof(struct respuesta), 0) < 0) {
             perror("mq_send");
-            mq_close(q_servidor);
-            mq_unlink("/100472037");
-            mq_close(q_cliente);
+            if(mq_close(q_servidor)==-1){
+                perror("mq_close servidor");
+            }
+            if(mq_unlink("/100472037")==-1){
+                perror("mq_unlink servidor");
+            }
+            if(mq_close(q_cliente)==-1){
+                perror("mq_close cliente");
+            }
             res.status = -1;
         }
     }
-    mq_close(q_cliente);
+    if(mq_close(q_cliente)==-1){
+        perror("mq_close cliente");
+    }
 
-    //mq_close(q_cliente);
     pthread_exit(0);
 }
 
@@ -249,9 +255,8 @@ int main(){
 
     q_servidor = mq_open("/100472037", O_CREAT|O_RDONLY, 0700, &attr);
     if (q_servidor == -1) {
-		perror("mq_open 1");
-        res.status = -1;
-		return res.status;
+		perror("servidor mq_open");
+		return -1;
 	}
 
     pthread_mutex_init(&mutex, NULL);
@@ -264,11 +269,14 @@ int main(){
     while(1) {
 
         if (mq_receive(q_servidor, (char *) &pet, sizeof(pet), 0) < 0){
-            mq_close(q_servidor);
-            mq_unlink("/100472037");
-            perror("mq_recev");
-            res.status = -1;
-            return res.status;
+            if(mq_close(q_servidor)==-1){
+                perror("servidor mq_close");
+            }
+            if(mq_unlink("/100472037")==1){
+                perror("servidor mq_unlink");
+            }
+            perror("servidor: mq_recev");
+            return -1;
         }
 
         if(pthread_create(&hilo, &t_attr, (void *)atender_peticion, (void *) &pet) == 0){
@@ -279,8 +287,10 @@ int main(){
 			pthread_mutex_unlock(&mutex);
 
         }
+        else{
+            perror("error creación de hilo");
+            return -1;
+        }
     }
-    mq_close(q_servidor);
-    mq_unlink("/SERVIDOR");
     return 0;
 }

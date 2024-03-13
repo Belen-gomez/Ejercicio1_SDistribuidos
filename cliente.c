@@ -20,18 +20,23 @@ int main(){
     if(set_value(2, cadena, N_value3, vector2) == 0){
         //printf("hola2");
     }
+    
 
     char gvalue[256];
     int N3;
     double vector3[32];
-    get_value(1, gvalue, &N3, vector3);
+    get_value(3, gvalue, &N3, vector3);
 
-    char cadena4[256] = "Adios mundo";
+    
+
+    /*char cadena4[256] = "Adios mundo";
 
     // Supongamos que tienes un vector de dobles con 3 elementos
-    int N_value4 = 1;
-    double vector4[] = {4.5};
+    int N_value4 = 4;
+    double vector4[] = {4.5, 7.4, 8.9, 17.8};
     
-    modify_value(1, cadena4, N_value4, vector4);
+    modify_value(1, cadena4, N_value4, vector4);*/
+    delete_key(3);
+    printf("%d", exist(1));
     return 0;
 }
