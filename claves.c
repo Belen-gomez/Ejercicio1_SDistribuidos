@@ -113,10 +113,11 @@ int set_value(int key,char *value1, int N_value2, double *V_value2){
 	pet.clave = key;
     strcpy(pet.valor1, value1);
     pet.N = N_value2;
-
     for (int i = 0; i< N_value2; i++){
         pet.valor2[i] = V_value2[i];
     }
+
+
 	strcpy(pet.q_name, queuename);
 
 	if (mq_send(q_servidor, (const char *)&pet, sizeof(struct peticion), 0) < 0) {

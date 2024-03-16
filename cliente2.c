@@ -1,19 +1,97 @@
-//
-// Created by belen on 13/03/24.
-//
-
 #include "claves.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#define MAX_SIZE 32
+#define MAXSIZE_STRING 256
 
 int main(){
-    char cadena[256] = "Hola mundo";
-
-    // Supongamos que tienes un vector de dobles con 3 elementos
-    int N_value2 = 2;
-    double vector[32] = {1.5, 2.2};
-    if(set_value(3, cadena, N_value2, vector) == 0){
-        //printf("hola2");
+    //Primer cliente. EL primer cliente debe hacer la función init.
+    if(init()==-1){
+        printf("Error en init\n");
     }
+    else{
+        printf("Lista inicializada\n");
+    }
+    
+    //El cliente 2 inserta el elemento <1, "Hola mundo", [1.5, 2.2]>
+    char cadena[MAXSIZE_STRING] = "Hola mundo";
+    int N_value2 = 2;
+    double vector[] = {1.5, 2.2};
+    if(set_value(1, cadena, N_value2, vector) == -1){
+        printf("Error en set_value\n");
+    }
+    else{
+        printf("Elemento insertado\n");
+    }
+
+    //El cliente 2 intenta inserta un elemento con N menor que 0. La función debe devolver -1
+    char cadena2[MAXSIZE_STRING] = "Hola mundo";
+    int N2= -1;
+    double vector2[] = {1.5, 2.2};
+    if(set_value(2, cadena2, N2, vector2) == -1){
+        printf("Error en set_value\n");
+    }
+    else{
+        printf("Elemento insertado\n");
+    }
+
+    //El cliente intenta inserta un elemento con N mayor que 32. La función debe devolver -1
+    char cadena3[MAXSIZE_STRING] = "Hola mundo";
+    int N3= 33;
+    double vector3[] = {1.5, 2.2};
+    if(set_value(2, cadena3, N3, vector3) == -1){
+        printf("Error en set_value\n");
+    }
+    else{
+        printf("Elemento insertado\n");
+    }
+
+    //El cliente 2 intenta insertar un elemento con clave 1, que ya existe. La función debe devolver -1
+    char cadena4[MAXSIZE_STRING] = "Hola mundo";
+    int N4 = 2;
+    double vector4[] = {1.5, 2.2};
+    if(set_value(1, cadena4, N4, vector4) == -1){
+        printf("Error en set_value\n");
+    }
+    else{
+        printf("Elemento insertado\n");
+    }
+  
+    //El cliente 2 intenta obtener los valores asociados a la clave 4, que no existe
+    char gvalue5[MAXSIZE_STRING];
+    int N5;
+    double vector5[32];
+    if(get_value(4, gvalue5, &N5, vector5)){
+        printf("Error en get_value\n");
+    }
+    else{
+        printf("cadena de caracteres: %s\n", gvalue5);
+        printf("tamaño del vector: %d\n", N5);
+        printf("vector: ");
+        for(int i=0; i<N5; i++){
+            printf("%f\n", vector5[i]);
+        }        
+    }
+
+    //El cliente 2 intenta modificar los valores asociados a la clave 4, que no existe
+    char cadena6[MAXSIZE_STRING] = "Adios mundo";
+    int N_value6 = 4;
+    double vector6[] = {4.5, 7.4, 8.9, 17.8};
+    
+    if(modify_value(4, cadena6, N_value6, vector6)==-1){
+        printf("Error en modify_value\n");
+    }
+    else{
+        printf("Elemento modificado\n");
+    }
+
+    //El cliente 2 intenta borrar un elemento con clave 4, que no existe
+    if(delete_key(4) == -1){
+        printf("Error en delete_key\n");
+    }
+    else{
+        printf("Elemento eliminado\n");
+    }
+
 }

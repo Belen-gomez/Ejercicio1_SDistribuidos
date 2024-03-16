@@ -1,4 +1,5 @@
 #define MAXSIZE	256
+#define MAX_SIZE 32
 #define INIT 0
 #define SET 1
 #define GET 2

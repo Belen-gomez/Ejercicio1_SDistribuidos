@@ -1,4 +1,4 @@
-BIN_FILES  = servidor cliente cliente2
+BIN_FILES  = servidor cliente1 cliente2 cliente3
 LIB_FILE = libclaves.so
 
 CC = gcc
@@ -10,11 +10,15 @@ LDLIBS = -lpthread -lrt
 
 all: $(BIN_FILES) $(LIB_FILE)
 
-cliente: cliente.o claves.o
+cliente1: cliente1.o claves.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 	chmod +x $@
 
 cliente2: cliente2.o claves.o
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
+	chmod +x $@
+
+cliente3: cliente3.o claves.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 	chmod +x $@
 

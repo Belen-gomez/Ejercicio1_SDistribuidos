@@ -136,7 +136,7 @@ int modify_value(List *l, int clave, char *valor1, int N, double *valor2){
         }
         aux = aux->siguiente;
     }
-    perror("Se ha intentado acceder a una clave que no existe");
+    perror("Se ha intentado modificar a una clave que no existe");
     return -1;
 }
 
@@ -180,6 +180,7 @@ int delete_key(List *l, int key) {
 
 int exist(List *l, int clave){
     pthread_mutex_lock(&funciones);
+    int encontrado = 0;
     
     if (*l == NULL) {
         perror("La lista está vacía");
@@ -189,17 +190,24 @@ int exist(List *l, int clave){
     while (aux != NULL) {
         if (aux->clave == clave) {
             // Se encontró la clave, copiar los valores a la estructura de respuesta
-            return 1;
+            encontrado = 1;
         }
         aux = aux->siguiente;
+        
     }
-    perror("No se encuentra la clave");
-    return 0;
+    if(encontrado == 0){
+        perror("No se encuentra la clave");
+        return 0;
+    }
+    else{
+        return 1;
+    }
 }
 
 void atender_peticion(struct peticion *pet){
     
     struct peticion peticion;
+
     pthread_mutex_lock(&mutex);
     peticion = *pet;
     mensaje_no_copiado = 0;
@@ -211,37 +219,25 @@ void atender_peticion(struct peticion *pet){
     
     if (peticion.op == 0){
         res.status = init(&lista);
-        printf("init\n");
-        printList(lista);
     }else if (peticion.op == 1){
         res.status = set_value(&lista, peticion.clave, peticion.valor1, peticion.N, peticion.valor2);
         pthread_mutex_unlock(&funciones);
-        printf("s_value, %d\n", peticion.clave);
-        printList(lista);
     }
     else if (peticion.op == 2){
         res.status =get_value(&lista, peticion.clave);
         pthread_mutex_unlock(&funciones);
-        printf("get_value\n");
-        printList(lista);
     }
     else if (peticion.op == 3){
         res.status = modify_value(&lista, peticion.clave, peticion.valor1, peticion.N, peticion.valor2);
         pthread_mutex_unlock(&funciones);
-        printf("modify_value\n");
-        printList(lista);
     }
     else if (peticion.op == 4){
         res.status = delete_key(&lista, peticion.clave);
         pthread_mutex_unlock(&funciones);
-        printf("delete_value\n");
-        printList(lista);
     }
     else if (peticion.op == 5){
         res.status = exist(&lista, peticion.clave);
         pthread_mutex_unlock(&funciones);
-        printf("exist \n");
-        printList(lista);
     }
     else{
         perror("Operacion no valida");
