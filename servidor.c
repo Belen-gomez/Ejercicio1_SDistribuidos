@@ -8,8 +8,10 @@
 #define MAXSIZE 256
 
 pthread_mutex_t mutex;
+pthread_mutex_t funciones;
 pthread_cond_t cond;
 int mensaje_no_copiado = 1;
+int lista_inicializada = 0;
 mqd_t q_servidor;
 mqd_t q_cliente =0;
 struct respuesta res;
@@ -18,13 +20,22 @@ struct respuesta res;
 List lista; // Lista enlazada para almacenar las tuplas
 
 int init(List *l) {
-
+    pthread_mutex_lock(&funciones);
+    while (*l != NULL) {
+        List temp = *l;
+        *l = (*l)->siguiente;
+        free(temp->valor2);
+        free(temp->valor1);
+        free(temp);
+    }
     *l = NULL;
+    pthread_mutex_unlock(&funciones);
     return 0;
 }
 
 
 int set_value(List *l, int clave, char *valor1, int N, double *valor2){
+    pthread_mutex_lock(&funciones);
     // Verificar si la clave ya existe en la lista
     List aux = *l;
     while (aux != NULL) {
@@ -41,6 +52,7 @@ int set_value(List *l, int clave, char *valor1, int N, double *valor2){
         return -1;
 
     ptr->clave = clave;
+    ptr->valor1 = malloc(strlen(valor1) + 1);
     strcpy(ptr->valor1, valor1);
     ptr->N = N;
     ptr->valor2 = malloc(N * sizeof(double));
@@ -49,7 +61,6 @@ int set_value(List *l, int clave, char *valor1, int N, double *valor2){
     }
     ptr->siguiente = *l;
     *l = ptr;
-
 
 	return 0;
 }
@@ -71,6 +82,8 @@ int printList(List l) {
 }
 
  int get_value(List *l, int clave){
+    pthread_mutex_lock(&funciones);
+    
     if (*l == NULL) {
         perror("La lista está vacía");
         return -1;
@@ -98,6 +111,8 @@ int printList(List l) {
 
 
 int modify_value(List *l, int clave, char *valor1, int N, double *valor2){
+    pthread_mutex_lock(&funciones);
+    
     if (*l == NULL) {
         perror("La lista está vacía");
         return -1;
@@ -108,8 +123,11 @@ int modify_value(List *l, int clave, char *valor1, int N, double *valor2){
         if (aux->clave == clave) {
             // Se encontró la clave, copiar los valores a la estructura de respuesta
             aux->clave = clave;
+            free(aux->valor1);
+            aux->valor1 = malloc(strlen(valor1) + 1);
             strcpy(aux->valor1, valor1);
             aux->N = N;
+            free(aux->valor2);
             aux->valor2 = malloc(N * sizeof(double));
             for(int i = 0; i < N; i++){
                 aux->valor2[i] = valor2[i];
@@ -123,6 +141,8 @@ int modify_value(List *l, int clave, char *valor1, int N, double *valor2){
 }
 
 int delete_key(List *l, int key) {
+    pthread_mutex_lock(&funciones);
+    
     if (*l == NULL) {
         perror("La lista está vacía");
         return -1;
@@ -153,11 +173,14 @@ int delete_key(List *l, int key) {
 
     // Liberar la memoria del nodo eliminado
     free(current->valor2); // Liberar la memoria del arreglo valor2
+    free(current->valor1); // Liberar la memoria de la cadena valor1
     free(current); // Liberar la memoria del nodo
     return 0; // Operación exitosa
 }
 
 int exist(List *l, int clave){
+    pthread_mutex_lock(&funciones);
+    
     if (*l == NULL) {
         perror("La lista está vacía");
         return -1;
@@ -185,29 +208,46 @@ void atender_peticion(struct peticion *pet){
 
 	pthread_mutex_unlock(&mutex);
 
+    
     if (peticion.op == 0){
         res.status = init(&lista);
+        printf("init\n");
+        printList(lista);
     }else if (peticion.op == 1){
         res.status = set_value(&lista, peticion.clave, peticion.valor1, peticion.N, peticion.valor2);
+        pthread_mutex_unlock(&funciones);
+        printf("s_value, %d\n", peticion.clave);
+        printList(lista);
     }
     else if (peticion.op == 2){
-        res.status =get_value(&lista, pet->clave);
+        res.status =get_value(&lista, peticion.clave);
+        pthread_mutex_unlock(&funciones);
+        printf("get_value\n");
+        printList(lista);
     }
     else if (peticion.op == 3){
-        res.status = modify_value(&lista, pet->clave, pet->valor1, pet->N, pet->valor2);
-        
+        res.status = modify_value(&lista, peticion.clave, peticion.valor1, peticion.N, peticion.valor2);
+        pthread_mutex_unlock(&funciones);
+        printf("modify_value\n");
+        printList(lista);
     }
     else if (peticion.op == 4){
-        res.status = delete_key(&lista, pet->clave);
+        res.status = delete_key(&lista, peticion.clave);
+        pthread_mutex_unlock(&funciones);
+        printf("delete_value\n");
+        printList(lista);
     }
     else if (peticion.op == 5){
-        res.status = exist(&lista, pet->clave);
+        res.status = exist(&lista, peticion.clave);
+        pthread_mutex_unlock(&funciones);
+        printf("exist \n");
+        printList(lista);
     }
     else{
         perror("Operacion no valida");
         res.status = -1;
     }
-
+    
     //se responde al cliente abriendo reviamente su cola
 
     q_cliente = mq_open(peticion.q_name, O_WRONLY);
@@ -260,6 +300,7 @@ int main(){
 	}
 
     pthread_mutex_init(&mutex, NULL);
+    pthread_mutex_init(&funciones, NULL);
     pthread_cond_init(&cond, NULL);
     pthread_attr_init(&t_attr);
 
