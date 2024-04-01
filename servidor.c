@@ -15,7 +15,7 @@ pthread_mutex_t funciones;
 pthread_cond_t cond;
 int mensaje_no_copiado = 1;
 int lista_inicializada = 0;
-int32_t res;
+int res;
 int err;
 
 
@@ -207,7 +207,8 @@ int exist(List *l, int clave){
 }
 
 void atender_peticion(int * s){
-    char op;
+    int32_t  op;
+    uint32_t respuesta;
     int sc;
     pthread_mutex_lock(&mutex);
     sc = (* (int *)s);
@@ -224,7 +225,7 @@ void atender_peticion(int * s){
         close(sc);
         //res = -1;
     }
-    
+    op = ntohl(op);
     if (err!=-1){
         if (op == 0){
         res = init(&lista);
@@ -254,14 +255,15 @@ void atender_peticion(int * s){
         }*/
     }
 
-    res = htonl(res);
-    err = sendMessage(sc, (char *)&res, sizeof(res));  // envía el resultado
+    respuesta = htonl(res);
+    printf("%d",res);
+    err = sendMessage(sc, (char *)&respuesta, sizeof(uint32_t));  // envía el resultado
     if (err == -1) {
         printf("Error en envio\n");
         close(sc);
     }
 
-    pthread_exit(0);
+    pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[]){
@@ -350,7 +352,6 @@ int main(int argc, char *argv[]){
             perror("error creación de hilo");
             return -1;
         }
-        close(sc);
     }
     close (sd);
 

@@ -19,7 +19,7 @@ int init(){
     struct hostent *hp;       
 	int32_t op;
 	int err;
-    int32_t res;
+    uint32_t res;
     err = obtenerVariablesEntorno();
     if (err == -1){
         printf("Error en las variables de entorno");
@@ -45,12 +45,12 @@ int init(){
     if (*endptr != '\0') {
         // Error: La cadena no es un número válido
         printf("Error: La cadena no es un número válido\n");
-    } else if (puerto < 0 || puerto > UINT16_MAX) {
+    } else if (puerto < 0 || puerto > UINT32_MAX) {
         // Error: Puerto fuera de rango
         printf("Error: Puerto fuera de rango\n");
     } else {
         // Conversión exitosa, puerto contiene el valor numérico
-        server_addr.sin_port = htons((uint32_t)puerto);
+        server_addr.sin_port = htons((int32_t)puerto);
     }
 
     // se establece la conexión
@@ -66,7 +66,7 @@ int init(){
 		printf("Error en envio\n");
 		return -1;
 	}
-    err = recvMessage(sd, (char *) &res, sizeof(res));     // recibe la respuesta
+    err = recvMessage(sd, (char *) &res, sizeof(uint32_t));     // recibe la respuesta
 	if (err == -1){
 		printf("Error en recepcion\n");
 		return -1;
