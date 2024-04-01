@@ -1,77 +1,82 @@
 #include "mensajes.h"
 #include "claves.h"
-#include <mqueue.h>
 #include <stdio.h>
+#include <netdb.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stddef.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <stdint.h>
+
+#define UINT32_MAX ((uint32_t)-1)
 
 
 int init(){
-    mqd_t q_servidor;       /* cola de mensajes del proceso servidor */
-	mqd_t q_cliente;        /* cola de mensajes para el proceso cliente */
-    char queuename[MAXSIZE];
-
-	//struct peticion pet = (struct peticion *)malloc(sizeof(struct peticion));
-	struct peticion pet;
-	struct respuesta res;        struct mq_attr attr;
-
-	attr.mq_maxmsg = 1;     attr.mq_msgsize = sizeof(struct respuesta);
-    sprintf(queuename,  "/Cola-%d", getpid());
-
-	q_cliente = mq_open(queuename, O_CREAT|O_RDONLY, 0700, &attr);
-	if (q_cliente == -1) {
-		perror("init: mq_open cliente");
-        res.status = -1;
-        return res.status;
-	}
-
-    q_servidor = mq_open("/100472037", O_WRONLY);
-	if (q_servidor == -1){
-		mq_close(q_cliente);
-		perror("init: mq_open servidor");
-        res.status = -1;
-        return res.status;
-	}
-	pet.op = 0;
-	strcpy(pet.q_name, queuename);
-
-	if (mq_send(q_servidor, (const char *)&pet, sizeof(struct peticion), 0) < 0) {
-		perror("init: mq_send servidor");
-        mq_close(q_servidor);
-        mq_close(q_cliente);
-        mq_unlink(queuename);
-        res.status = -1;
-        return res.status;
-	}
-	
-	if (mq_receive(q_cliente, (char *)&res, sizeof(struct respuesta), 0) < 0) {
-        mq_close(q_servidor);
-        mq_close(q_cliente);
-        mq_unlink(queuename);
-		perror("init: mq_receive cliente");
-        res.status = -1;
-        return res.status;
-	}
-	if(mq_close(q_servidor) == -1){
-        perror("init: mq_close servidor");
-        res.status = -1;
-        return res.status;
+    int sd;
+    struct sockaddr_in server_addr;
+    struct hostent *hp;       
+	int32_t op;
+	int err;
+    int32_t res;
+    err = obtenerVariablesEntorno();
+    if (err == -1){
+        printf("Error en las variables de entorno");
+        return -1;
     }
-	if(mq_close(q_cliente)==-1){
-        perror("init: mq_close cliente");
-        res.status = -1;
-        return res.status;
+
+    sd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sd == 1) {
+		printf("Error en socket\n");
+		return -1;
+	}
+    hp = gethostbyname (obtenerIP());
+	if (hp == NULL) {
+		printf("Error en gethostbyname\n");
+		return -1;
+	}
+
+    bzero((char *)&server_addr, sizeof(server_addr));
+    memcpy (&(server_addr.sin_addr), hp->h_addr, hp->h_length);
+   	server_addr.sin_family  = AF_INET;
+   	char *endptr;
+    long int puerto = strtol(obtenerPuerto(), &endptr, 10);
+    if (*endptr != '\0') {
+        // Error: La cadena no es un número válido
+        printf("Error: La cadena no es un número válido\n");
+    } else if (puerto < 0 || puerto > UINT16_MAX) {
+        // Error: Puerto fuera de rango
+        printf("Error: Puerto fuera de rango\n");
+    } else {
+        // Conversión exitosa, puerto contiene el valor numérico
+        server_addr.sin_port = htons((uint32_t)puerto);
     }
-    if(mq_unlink(queuename)==-1){
-        perror("init: mq_unlink");
-        res.status = -1;
-        return res.status;
-    }
-    return res.status;
+
+    // se establece la conexión
+   	err = connect(sd, (struct sockaddr *) &server_addr,  sizeof(server_addr));
+	if (err == -1) {
+		printf("Error en connect\n");
+		return -1;
+	}
+    op = htonl(0);
+
+    err = sendMessage(sd, (char *) &op, sizeof(op)); // envía op
+	if (err == -1){
+		printf("Error en envio\n");
+		return -1;
+	}
+    err = recvMessage(sd, (char *) &res, sizeof(res));     // recibe la respuesta
+	if (err == -1){
+		printf("Error en recepcion\n");
+		return -1;
+	}
+    close(sd);
+    return res;
 
 }
 
-int set_value(int key,char *value1, int N_value2, double *V_value2){
+/*int set_value(int key,char *value1, int N_value2, double *V_value2){
     struct respuesta res;
     if(N_value2>32){
         perror("Vector demasiado grande");
@@ -436,4 +441,4 @@ int exist(int key){
         return res.status;
     }
     return res.status;
-}
+}*/

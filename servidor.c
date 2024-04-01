@@ -1,10 +1,13 @@
 #include "mensajes.h"
 #include "servidor.h"
-#include <mqueue.h>
 #include <stdio.h>
 #include <pthread.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stddef.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 #define MAXSIZE 256
 
 pthread_mutex_t mutex;
@@ -12,9 +15,8 @@ pthread_mutex_t funciones;
 pthread_cond_t cond;
 int mensaje_no_copiado = 1;
 int lista_inicializada = 0;
-mqd_t q_servidor;
-mqd_t q_cliente =0;
-struct respuesta res;
+int32_t res;
+int err;
 
 
 List lista; // Lista enlazada para almacenar las tuplas
@@ -81,7 +83,7 @@ int printList(List l) {
     return 0;
 }
 
- int get_value(List *l, int clave){
+ /*int get_value(List *l, int clave){
     pthread_mutex_lock(&funciones);
     
     if (*l == NULL) {
@@ -107,7 +109,7 @@ int printList(List l) {
     perror("Se ha intentado acceder a una clave que no existe");
     return -1;
 
-}
+}*/
 
 
 int modify_value(List *l, int clave, char *valor1, int N, double *valor2){
@@ -204,96 +206,73 @@ int exist(List *l, int clave){
     }
 }
 
-void atender_peticion(struct peticion *pet){
-    
-    struct peticion peticion;
-
+void atender_peticion(int * s){
+    char op;
+    int sc;
     pthread_mutex_lock(&mutex);
-    peticion = *pet;
+    sc = (* (int *)s);
     mensaje_no_copiado = 0;
 
 	pthread_cond_signal(&cond);
 
 	pthread_mutex_unlock(&mutex);
 
-    
-    if (peticion.op == 0){
-        res.status = init(&lista);
-    }else if (peticion.op == 1){
-        res.status = set_value(&lista, peticion.clave, peticion.valor1, peticion.N, peticion.valor2);
-        pthread_mutex_unlock(&funciones);
-    }
-    else if (peticion.op == 2){
-        res.status =get_value(&lista, peticion.clave);
-        pthread_mutex_unlock(&funciones);
-    }
-    else if (peticion.op == 3){
-        res.status = modify_value(&lista, peticion.clave, peticion.valor1, peticion.N, peticion.valor2);
-        pthread_mutex_unlock(&funciones);
-    }
-    else if (peticion.op == 4){
-        res.status = delete_key(&lista, peticion.clave);
-        pthread_mutex_unlock(&funciones);
-    }
-    else if (peticion.op == 5){
-        res.status = exist(&lista, peticion.clave);
-        pthread_mutex_unlock(&funciones);
-    }
-    else{
-        perror("Operacion no valida");
-        res.status = -1;
-    }
-    
-    //se responde al cliente abriendo reviamente su cola
 
-    q_cliente = mq_open(peticion.q_name, O_WRONLY);
-    if (q_cliente < 0) {
-        perror("mq_open 2");
-        if(mq_close(q_servidor)==-1){
-            perror("mq_close servidor");
-        }
-        if(mq_unlink("/100472037")==-1){
-            perror("mq_unlink servidor");
-        }
-        res.status = -1;
+    err = recvMessage ( sc, (char *) &op, sizeof(op));   // recibe la operación
+    if (err == -1) {
+        printf("Error en recepcion\n");
+        close(sc);
+        //res = -1;
     }
-    else{
-        if (mq_send(q_cliente, (const char *)&res, sizeof(struct respuesta), 0) < 0) {
-            perror("mq_send");
-            if(mq_close(q_servidor)==-1){
-                perror("mq_close servidor");
-            }
-            if(mq_unlink("/100472037")==-1){
-                perror("mq_unlink servidor");
-            }
-            if(mq_close(q_cliente)==-1){
-                perror("mq_close cliente");
-            }
+    
+    if (err!=-1){
+        if (op == 0){
+        res = init(&lista);
+        }/*else if (peticion.op == 1){
+            res.status = set_value(&lista, peticion.clave, peticion.valor1, peticion.N, peticion.valor2);
+            pthread_mutex_unlock(&funciones);
+        }
+        else if (peticion.op == 2){
+            res.status =get_value(&lista, peticion.clave);
+            pthread_mutex_unlock(&funciones);
+        }
+        else if (peticion.op == 3){
+            res.status = modify_value(&lista, peticion.clave, peticion.valor1, peticion.N, peticion.valor2);
+            pthread_mutex_unlock(&funciones);
+        }
+        else if (peticion.op == 4){
+            res.status = delete_key(&lista, peticion.clave);
+            pthread_mutex_unlock(&funciones);
+        }
+        else if (peticion.op == 5){
+            res.status = exist(&lista, peticion.clave);
+            pthread_mutex_unlock(&funciones);
+        }
+        else{
+            perror("Operacion no valida");
             res.status = -1;
-        }
+        }*/
     }
-    if(mq_close(q_cliente)==-1){
-        perror("mq_close cliente");
+
+    res = htonl(res);
+    err = sendMessage(sc, (char *)&res, sizeof(res));  // envía el resultado
+    if (err == -1) {
+        printf("Error en envio\n");
+        close(sc);
     }
 
     pthread_exit(0);
 }
 
-int main(){
+int main(int argc, char *argv[]){
+
+    if (argc!=2){
+        perror("Error en los argumentos");
+        return -1;
+    }
+
     pthread_t hilo;
     pthread_attr_t t_attr;		// atributos de los threads
-
-    struct peticion pet;
-    struct mq_attr attr;
-
-    attr.mq_maxmsg = 10;
-	attr.mq_msgsize = sizeof(struct peticion);
-
-    q_servidor = mq_open("/100472037", O_CREAT|O_RDONLY, 0700, &attr);
-    if (q_servidor == -1) {
-		perror("servidor mq_open");
-		return -1;
-	}
 
     pthread_mutex_init(&mutex, NULL);
     pthread_mutex_init(&funciones, NULL);
@@ -303,20 +282,63 @@ int main(){
 	//atributos de los threads, threads independientes
 	pthread_attr_setdetachstate(&t_attr, PTHREAD_CREATE_DETACHED);
 
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t size;
+    int sd, sc;
+    int val;
+
+    if ((sd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("Error en el socket");
+        return 0;
+    }
+
+    val = 1;
+    setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (char *)&val, sizeof(int));
+
+    bzero((char *)&server_addr, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+
+    char *endptr;
+    uint32_t puerto;
+    long port_arg = strtol(argv[1], &endptr, 10);
+    if (endptr != argv[1] && *endptr == '\0') {
+        puerto = (int)port_arg;
+    } else {
+        fprintf(stderr, "El argumento de puerto no es un número válido.\n");
+        return -1;
+    }
+
+    server_addr.sin_port = htons(puerto);
+
+    err = bind(sd, (const struct sockaddr *)&server_addr,
+			sizeof(server_addr));
+	if (err == -1) {
+		printf("Error en bind\n");
+		return -1;
+	}
+
+    err = listen(sd, SOMAXCONN);
+	if (err == -1) {
+		printf("Error en listen\n");
+		return -1;
+	}
+
+    size = sizeof(client_addr);
+
     while(1) {
 
-        if (mq_receive(q_servidor, (char *) &pet, sizeof(pet), 0) < 0){
-            if(mq_close(q_servidor)==-1){
-                perror("servidor mq_close");
-            }
-            if(mq_unlink("/100472037")==1){
-                perror("servidor mq_unlink");
-            }
-            perror("servidor: mq_recev");
-            return -1;
-        }
+        printf("esperando conexion\n");
+    	sc = accept(sd, (struct sockaddr *)&client_addr, (socklen_t *)&size);
+        printf("conexión aceptada de IP: %s   Puerto: %d\n",
+		inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
-        if(pthread_create(&hilo, &t_attr, (void *)atender_peticion, (void *) &pet) == 0){
+		if (sc == -1) {
+			printf("Error en accept\n");
+			return -1;
+		}        
+
+        if(pthread_create(&hilo, &t_attr, (void *)atender_peticion, (int *) &sc) == 0){
             pthread_mutex_lock(&mutex);
 			while (mensaje_no_copiado)
 				pthread_cond_wait(&cond, &mutex);
@@ -328,6 +350,9 @@ int main(){
             perror("error creación de hilo");
             return -1;
         }
+        close(sc);
     }
-    return 0;
+    close (sd);
+
+    return(0);
 }
