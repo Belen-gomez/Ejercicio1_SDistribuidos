@@ -72,373 +72,468 @@ int init(){
 		return -1;
 	}
     close(sd);
+    res = ntohl(res);
     return res;
 
 }
 
-/*int set_value(int key,char *value1, int N_value2, double *V_value2){
-    struct respuesta res;
+int set_value(int key,char *value1, int N_value2, double *V_value2){
     if(N_value2>32){
         perror("Vector demasiado grande");
-        res.status = -1;
-        return res.status;
+        return -1;
 
     }
     if(N_value2<0){
         perror("Argumento N negativo");
-        res.status = -1;
-        return res.status;
+        return -1;
 
     }
+    int sd;
+    struct sockaddr_in server_addr;
+    struct hostent *hp;       
+	int32_t op;
+	int err;
+    uint32_t res;
+    err = obtenerVariablesEntorno();
+    if (err == -1){
+        printf("Error en las variables de entorno");
+        return -1;
+    }
 
-	mqd_t q_servidor;       
-	mqd_t q_cliente;
-    char queuename[MAXSIZE];
-	struct peticion pet;
-	struct mq_attr attr;
-
-	attr.mq_maxmsg = 1;     attr.mq_msgsize = sizeof(struct respuesta);
-    sprintf(queuename,  "/Cola-%d", getpid());
-
-	q_cliente = mq_open(queuename, O_CREAT|O_RDONLY, 0700, &attr);
-	if (q_cliente == -1) {
-		perror("set_value: mq_open cliente");
-        res.status = -1;
-        return res.status;
+    sd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sd == 1) {
+		printf("Error en socket\n");
+		return -1;
+	}
+    hp = gethostbyname (obtenerIP());
+	if (hp == NULL) {
+		printf("Error en gethostbyname\n");
+		return -1;
 	}
 
-    q_servidor = mq_open("/100472037", O_WRONLY);
-	if (q_servidor == -1){
-		mq_close(q_cliente);
-		perror("set_value: mq_open servidor");
-        res.status = -1;
-        return res.status;
+    bzero((char *)&server_addr, sizeof(server_addr));
+    memcpy (&(server_addr.sin_addr), hp->h_addr, hp->h_length);
+   	server_addr.sin_family  = AF_INET;
+   	char *endptr;
+    long int puerto = strtol(obtenerPuerto(), &endptr, 10);
+    if (*endptr != '\0') {
+        // Error: La cadena no es un número válido
+        printf("Error: La cadena no es un número válido\n");
+    } else if (puerto < 0 || puerto > UINT32_MAX) {
+        // Error: Puerto fuera de rango
+        printf("Error: Puerto fuera de rango\n");
+    } else {
+        // Conversión exitosa, puerto contiene el valor numérico
+        server_addr.sin_port = htons((int32_t)puerto);
+    }
+
+    // se establece la conexión
+   	err = connect(sd, (struct sockaddr *) &server_addr,  sizeof(server_addr));
+	if (err == -1) {
+		printf("Error en connect\n");
+		return -1;
 	}
-	pet.op = 1;
-	pet.clave = key;
-    strcpy(pet.valor1, value1);
-    pet.N = N_value2;
+    op = htonl(1);
+    int clave = htonl(key);
+    char valor1[256];
+    strcpy(valor1, value1);
+    int N = htonl(N_value2);
+    double valor2[32];      
+    err = sendMessage(sd, (char *) &op, sizeof(op)); // envía op
+	if (err == -1){
+		printf("Error en envio de op\n");
+        close(sd);
+		return -1;
+	}
+    err = sendMessage(sd, (char *) &clave, sizeof(clave)); // envía op
+	if (err == -1){
+		printf("Error en envio de clave\n");
+        close(sd);
+		return -1;
+	}
+    err = sendMessage(sd, (char *) &valor1, sizeof(valor1)); // envía op
+	if (err == -1){
+		printf("Error en envio de valor1\n");
+        close(sd);
+		return -1;
+	}
+    err = sendMessage(sd, (char *) &N, sizeof(N)); // envía op
+	if (err == -1){
+		printf("Error en envio de valor1\n");
+        close(sd);
+		return -1;
+	}
     for (int i = 0; i< N_value2; i++){
-        pet.valor2[i] = V_value2[i];
-    }
-
-
-	strcpy(pet.q_name, queuename);
-
-	if (mq_send(q_servidor, (const char *)&pet, sizeof(struct peticion), 0) < 0) {
-		perror("set_value: mq_send servidor");
-		mq_close(q_servidor);
-		mq_close(q_cliente);
-        mq_unlink(queuename);
-        res.status = -1;
-        return res.status;
+            valor2[i] = V_value2[i];
+            err = sendMessage(sd, (char *) &valor2[i], sizeof(valor2[i])); // envía op
+            if (err == -1){
+                printf("Error en envio de valor2 %d\n", i);
+                close(sd);
+                return -1;
 	}
-	if (mq_receive(q_cliente, (char *)&res, sizeof(struct respuesta), 0) < 0) {
-		perror("set_value: mq_receive cliente");
-		mq_close(q_servidor);
-		mq_close(q_cliente);
-        mq_unlink(queuename);
-        res.status = -1;
-		return res.status;
+    }
+    err = recvMessage(sd, (char *) &res, sizeof(uint32_t));     // recibe la respuesta
+	if (err == -1){
+		printf("Error en recepcion\n");
+        close(sd);
+		return -1;
 	}
-	if(mq_close(q_servidor) == -1){
-        perror("set_value: mq_close servidor");
-        res.status = -1;
-        return res.status;
-    }
-	if(mq_close(q_cliente)==-1){
-        perror("set_value: mq_close cliente");
-        res.status = -1;
-        return res.status;
-    }
-    if(mq_unlink(queuename)==-1){
-        perror("set_value: mq_unlink");
-        res.status = -1;
-        return res.status;
-    }
-	return res.status;
+    close(sd);
+    res = ntohl(res);
+    return res;
+
 }
 
 int get_value(int key,char *value1, int *N_value, double *V_value2){
-    struct respuesta res;
-    mqd_t q_servidor;
-    mqd_t q_cliente;
-    char queuename[MAXSIZE];
-    struct peticion pet;
-    struct mq_attr attr;
-
-    attr.mq_maxmsg = 1;     attr.mq_msgsize = sizeof(struct respuesta);
-    sprintf(queuename,  "/Cola-%d", getpid());
-
-    q_cliente = mq_open(queuename, O_CREAT|O_RDONLY, 0700, &attr);
-    if (q_cliente == -1) {
-        perror("get_value: mq_open cliente");
-        res.status = -1;
-        return res.status;
+    int sd;
+    struct sockaddr_in server_addr;
+    struct hostent *hp;       
+	int32_t op;
+    char valor1[256];
+    int32_t N;
+    double valor2[32];
+	int err;
+    uint32_t res;
+    err = obtenerVariablesEntorno();
+    if (err == -1){
+        printf("Error en las variables de entorno");
+        return -1;
     }
 
-    q_servidor = mq_open("/100472037", O_WRONLY);
-    if (q_servidor == -1){
-        mq_close(q_cliente);
-        perror("get_value: mq_open servidor");
-        res.status = -1;
-        return res.status;
-    }
-    pet.op = 2;
-    pet.clave = key;
+    sd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sd == 1) {
+		printf("Error en socket\n");
+		return -1;
+	}
+    hp = gethostbyname (obtenerIP());
+	if (hp == NULL) {
+		printf("Error en gethostbyname\n");
+        close(sd);
+		return -1;
+	}
 
-    strcpy(pet.q_name, queuename);
+    bzero((char *)&server_addr, sizeof(server_addr));
+    memcpy (&(server_addr.sin_addr), hp->h_addr, hp->h_length);
+   	server_addr.sin_family  = AF_INET;
+   	char *endptr;
+    long int puerto = strtol(obtenerPuerto(), &endptr, 10);
+    if (*endptr != '\0') {
+        // Error: La cadena no es un número válido
+        printf("Error: La cadena no es un número válido\n");
+        close(sd);
+    } else if (puerto < 0 || puerto > UINT32_MAX) {
+        // Error: Puerto fuera de rango
+        printf("Error: Puerto fuera de rango\n");
+        close(sd);
+    } else {
+        // Conversión exitosa, puerto contiene el valor numérico
+        server_addr.sin_port = htons((int32_t)puerto);
+    }
 
-    if (mq_send(q_servidor, (const char *)&pet, sizeof(struct peticion), 0) < 0) {
-        perror("get_value: mq_send servidor");
-        mq_close(q_servidor);
-        mq_close(q_cliente);
-        mq_unlink(queuename);
-        res.status = -1;
-        return res.status;
+    // se establece la conexión
+   	err = connect(sd, (struct sockaddr *) &server_addr,  sizeof(server_addr));
+	if (err == -1) {
+		printf("Error en connect\n");
+        close(sd);
+		return -1;
+	}
+    op = htonl(2);
+    int clave = htonl(key);
+    err = sendMessage(sd, (char *) &op, sizeof(op)); // envía op
+	if (err == -1){
+		printf("Error en envio de clave\n");
+        close(sd);
+		return -1;
+	}
+    err = sendMessage(sd, (char *) &clave, sizeof(clave)); // envía op
+	if (err == -1){
+		printf("Error en envio de clave\n");
+        close(sd);
+		return -1;
+	}
+    err = recvMessage(sd, (char *) &res, sizeof(uint32_t));     // recibe la respuesta
+	if (err == -1){
+		printf("Error en recepcion\n");
+        close(sd);
+		return -1;
+	}
+    if (res==0){
+    err = recvMessage(sd, (char *) &valor1, sizeof(valor1));     // recibe la respuesta
+	if (err == -1){
+		printf("Error en recepcion\n");
+        close(sd);
+		return -1;
+	}
+    strcpy(value1, valor1);
+    err = recvMessage(sd, (char *) &N, sizeof(uint32_t));     // recibe la respuest
+	if (err == -1){
+		printf("Error en recepcion\n");
+        close(sd);
+		return -1;
+	}
+    N= ntohl(N);
+    *N_value = N;
+    for (int i = 0; i< N; i++){
+                err = recvMessage ( sd, (char *) &valor2[i], sizeof(double));   // recibe la operación
+                if (err == -1) {
+                    printf("Error en recepcion\n");
+                    close(sd);
+                    //res = -1;
+                }
+                V_value2[i] = valor2[i];
+            }
     }
-    if (mq_receive(q_cliente, (char *)&res, sizeof(struct respuesta), 0) < 0) {
-        perror("get_value: mq_receive cliente");
-        mq_close(q_servidor);
-        mq_close(q_cliente);
-        mq_unlink(queuename);
-        res.status = -1;
-        return res.status;
-    }
-    strcpy(value1, res.valor1); 
-    *N_value = res.N;
-   
-    for (int i = 0; i< res.N; i++){
-        V_value2[i] = res.valor2[i];
-    }
-    if(mq_close(q_servidor) == -1){
-        perror("get_value: mq_close servidor");
-        res.status = -1;
-        return res.status;
-    }
-	if(mq_close(q_cliente)==-1){
-        perror("get_value: mq_close cliente");
-        res.status = -1;
-        return res.status;
-    }
-    if(mq_unlink(queuename)==-1){
-        perror("get_value: mq_unlink");
-        res.status = -1;
-        return res.status;
-    }
-    return res.status;
+    close(sd);
+    res = ntohl(res);
+    return res;
+
 }
 
 
 int modify_value(int key, char *value1, int N_value2, double *V_value2){
-    struct respuesta res;
     if(N_value2>32){
         perror("Vector demasiado grande");
-        res.status = -1;
-        return res.status;
+        return -1;
 
     }
     if(N_value2<0){
         perror("Argumento N negativo");
-        res.status = -1;
-        return res.status;
+        return -1;
 
     }
+    int sd;
+    struct sockaddr_in server_addr;
+    struct hostent *hp;       
+	int32_t op;
+	int err;
+    uint32_t res;
+    err = obtenerVariablesEntorno();
+    if (err == -1){
+        printf("Error en las variables de entorno");
+        return -1;
+    }
 
-	mqd_t q_servidor;       
-	mqd_t q_cliente;
-    char queuename[MAXSIZE];
-	struct peticion pet;
-	struct mq_attr attr;
-
-	attr.mq_maxmsg = 1;     attr.mq_msgsize = sizeof(struct respuesta);
-    sprintf(queuename,  "/Cola-%d", getpid());
-
-	q_cliente = mq_open(queuename, O_CREAT|O_RDONLY, 0700, &attr);
-	if (q_cliente == -1) {
-		perror("modify: mq_open cliente");
-        res.status = -1;
-        return res.status;
+    sd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sd == 1) {
+		printf("Error en socket\n");
+		return -1;
+	}
+    hp = gethostbyname (obtenerIP());
+	if (hp == NULL) {
+		printf("Error en gethostbyname\n");
+		return -1;
 	}
 
-    q_servidor = mq_open("/100472037", O_WRONLY);
-	if (q_servidor == -1){
-		mq_close(q_cliente);
-		perror("modify: mq_open servidor");
-        res.status = -1;
-        return res.status;
+    bzero((char *)&server_addr, sizeof(server_addr));
+    memcpy (&(server_addr.sin_addr), hp->h_addr, hp->h_length);
+   	server_addr.sin_family  = AF_INET;
+   	char *endptr;
+    long int puerto = strtol(obtenerPuerto(), &endptr, 10);
+    if (*endptr != '\0') {
+        // Error: La cadena no es un número válido
+        printf("Error: La cadena no es un número válido\n");
+    } else if (puerto < 0 || puerto > UINT32_MAX) {
+        // Error: Puerto fuera de rango
+        printf("Error: Puerto fuera de rango\n");
+    } else {
+        // Conversión exitosa, puerto contiene el valor numérico
+        server_addr.sin_port = htons((int32_t)puerto);
+    }
+
+    // se establece la conexión
+   	err = connect(sd, (struct sockaddr *) &server_addr,  sizeof(server_addr));
+	if (err == -1) {
+		printf("Error en connect\n");
+		return -1;
 	}
-
-	pet.op =3;
-	pet.clave = key;
-    strcpy(pet.valor1, value1);
-    pet.N = N_value2;
-
+    op = htonl(3);
+    int clave = htonl(key);
+    char valor1[256];
+    strcpy(valor1, value1);
+    int N = htonl(N_value2);
+    double valor2[32];      
+    err = sendMessage(sd, (char *) &op, sizeof(op)); // envía op
+	if (err == -1){
+		printf("Error en envio de op\n");
+        close(sd);
+		return -1;
+	}
+    err = sendMessage(sd, (char *) &clave, sizeof(clave)); // envía op
+	if (err == -1){
+		printf("Error en envio de clave\n");
+        close(sd);
+		return -1;
+	}
+    err = sendMessage(sd, (char *) &valor1, sizeof(valor1)); // envía op
+	if (err == -1){
+		printf("Error en envio de valor1\n");
+        close(sd);
+		return -1;
+	}
+    err = sendMessage(sd, (char *) &N, sizeof(N)); // envía op
+	if (err == -1){
+		printf("Error en envio de valor1\n");
+        close(sd);
+		return -1;
+	}
     for (int i = 0; i< N_value2; i++){
-        pet.valor2[i] = V_value2[i];
-    }
-	strcpy(pet.q_name, queuename);
-
-	if (mq_send(q_servidor, (const char *)&pet, sizeof(struct peticion), 0) < 0) {
-		perror("modify: mq_send 3 servidor");
-		mq_close(q_servidor);
-		mq_close(q_cliente);
-        mq_unlink(queuename);
-        res.status = -1;
-        return res.status;
+            valor2[i] = V_value2[i];
+            err = sendMessage(sd, (char *) &valor2[i], sizeof(valor2[i])); // envía op
+            if (err == -1){
+                printf("Error en envio de valor2 %d\n", i);
+                close(sd);
+                return -1;
 	}
-	if (mq_receive(q_cliente, (char *)&res, sizeof(struct respuesta), 0) < 0) {
-		perror("modify: mq_receive cliente");
-		mq_close(q_servidor);
-		mq_close(q_cliente);
-        mq_unlink(queuename);
-        res.status = -1;
-		return res.status;
+    }
+    err = recvMessage(sd, (char *) &res, sizeof(uint32_t));     // recibe la respuesta
+	if (err == -1){
+		printf("Error en recepcion\n");
+        close(sd);
+		return -1;
 	}
-	if(mq_close(q_servidor) == -1){
-        perror("modify: mq_close servidor");
-        res.status = -1;
-        return res.status;
-    }
-	if(mq_close(q_cliente)==-1){
-        perror("modify: mq_close cliente");
-        res.status = -1;
-        return res.status;
-    }
-    if(mq_unlink(queuename)==-1){
-        perror("modify: mq_unlink");
-        res.status = -1;
-        return res.status;
-    }
-	return res.status;
+    close(sd);
+    res = ntohl(res);
+    return res;
 }
 
 int delete_key(int key){
-    struct respuesta res;
-    mqd_t q_servidor;
-    mqd_t q_cliente;
-    char queuename[MAXSIZE];
-    struct peticion pet;
-    struct mq_attr attr;
-
-    attr.mq_maxmsg = 1;     attr.mq_msgsize = sizeof(struct respuesta);
-    sprintf(queuename,  "/Cola-%d", getpid());
-
-    q_cliente = mq_open(queuename, O_CREAT|O_RDONLY, 0700, &attr);
-    if (q_cliente == -1) {
-        perror("delete: mq_open cliente");
-        res.status = -1;
-        return res.status;
+    int sd;
+    struct sockaddr_in server_addr;
+    struct hostent *hp;       
+	int32_t op;
+	int err;
+    uint32_t res;
+    err = obtenerVariablesEntorno();
+    if (err == -1){
+        printf("Error en las variables de entorno");
+        return -1;
     }
 
-    q_servidor = mq_open("/100472037", O_WRONLY);
-    if (q_servidor == -1){
-        mq_close(q_cliente);
-        perror("delete: mq_open servidor");
-        res.status = -1;
-        return res.status;
-    }
-    pet.op = 4;
-    pet.clave = key;
+    sd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sd == 1) {
+		printf("Error en socket\n");
+		return -1;
+	}
+    hp = gethostbyname (obtenerIP());
+	if (hp == NULL) {
+		printf("Error en gethostbyname\n");
+		return -1;
+	}
 
-    strcpy(pet.q_name, queuename);
-
-    if (mq_send(q_servidor, (const char *)&pet, sizeof(struct peticion), 0) < 0) {
-        perror("delete: mq_send 3 servidor");
-        mq_close(q_servidor);
-        mq_close(q_cliente);
-        mq_unlink(queuename);
-        res.status = -1;
-        return res.status;
-    }
-    if (mq_receive(q_cliente, (char *)&res, sizeof(struct respuesta), 0) < 0) {
-        perror("delete: mq_receive cliente");
-        mq_close(q_servidor);
-        mq_close(q_cliente);
-        mq_unlink(queuename);
-        res.status = -1;
-        return res.status;
+    bzero((char *)&server_addr, sizeof(server_addr));
+    memcpy (&(server_addr.sin_addr), hp->h_addr, hp->h_length);
+   	server_addr.sin_family  = AF_INET;
+   	char *endptr;
+    long int puerto = strtol(obtenerPuerto(), &endptr, 10);
+    if (*endptr != '\0') {
+        // Error: La cadena no es un número válido
+        printf("Error: La cadena no es un número válido\n");
+    } else if (puerto < 0 || puerto > UINT32_MAX) {
+        // Error: Puerto fuera de rango
+        printf("Error: Puerto fuera de rango\n");
+    } else {
+        // Conversión exitosa, puerto contiene el valor numérico
+        server_addr.sin_port = htons((int32_t)puerto);
     }
 
-    if(mq_close(q_servidor) == -1){
-        perror("delete: mq_close servidor");
-        res.status = -1;
-        return res.status;
-    }
-	if(mq_close(q_cliente)==-1){
-        perror("delete: mq_close cliente");
-        res.status = -1;
-        return res.status;
-    }
-    if(mq_unlink(queuename)==-1){
-        perror("delete: mq_unlink");
-        res.status = -1;
-        return res.status;
-    }
-    return res.status;
+    // se establece la conexión
+   	err = connect(sd, (struct sockaddr *) &server_addr,  sizeof(server_addr));
+	if (err == -1) {
+		printf("Error en connect\n");
+		return -1;
+	}
+    op = htonl(4);
+    int clave = htonl(key);    
+    err = sendMessage(sd, (char *) &op, sizeof(op)); // envía op
+	if (err == -1){
+		printf("Error en envio de op\n");
+        close(sd);
+		return -1;
+	}
+    err = sendMessage(sd, (char *) &clave, sizeof(clave)); // envía op
+	if (err == -1){
+		printf("Error en envio de clave\n");
+        close(sd);
+		return -1;
+	}
+    err = recvMessage(sd, (char *) &res, sizeof(uint32_t));     // recibe la respuesta
+	if (err == -1){
+		printf("Error en recepcion\n");
+        close(sd);
+		return -1;
+	}
+    close(sd);
+    res = ntohl(res);
+    return res;
 }
 
 int exist(int key){
-    struct respuesta res;
-    mqd_t q_servidor;
-    mqd_t q_cliente;
-    char queuename[MAXSIZE];
-    struct peticion pet;
-    struct mq_attr attr;
-
-    attr.mq_maxmsg = 1;     attr.mq_msgsize = sizeof(struct respuesta);
-    sprintf(queuename,  "/Cola-%d", getpid());
-
-    q_cliente = mq_open(queuename, O_CREAT|O_RDONLY, 0700, &attr);
-    if (q_cliente == -1) {
-        perror("exist: mq_open cliente");
-        res.status = -1;
-        return res.status;
+    int sd;
+    struct sockaddr_in server_addr;
+    struct hostent *hp;       
+	int32_t op;
+	int err;
+    uint32_t res;
+    err = obtenerVariablesEntorno();
+    if (err == -1){
+        printf("Error en las variables de entorno");
+        return -1;
     }
 
-    q_servidor = mq_open("/100472037", O_WRONLY);
-    if (q_servidor == -1){
-        mq_close(q_cliente);
-        perror("exist: mq_open servidor");
-        res.status = -1;
-        return res.status;
-    }
-    pet.op = 5;
-    pet.clave = key;
+    sd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sd == 1) {
+		printf("Error en socket\n");
+		return -1;
+	}
+    hp = gethostbyname (obtenerIP());
+	if (hp == NULL) {
+		printf("Error en gethostbyname\n");
+		return -1;
+	}
 
-    strcpy(pet.q_name, queuename);
-
-    if (mq_send(q_servidor, (const char *)&pet, sizeof(struct peticion), 0) < 0) {
-        perror("exist: mq_send 3 servidor");
-        mq_close(q_servidor);
-        mq_close(q_cliente);
-        mq_unlink(queuename);
-        res.status = -1;
-        return res.status;
-    }
-    if (mq_receive(q_cliente, (char *)&res, sizeof(struct respuesta), 0) < 0) {
-        perror("exist: mq_receive cliente");
-        mq_close(q_servidor);
-        mq_close(q_cliente);
-        mq_unlink(queuename);
-        res.status = -1;
-        return res.status;
+    bzero((char *)&server_addr, sizeof(server_addr));
+    memcpy (&(server_addr.sin_addr), hp->h_addr, hp->h_length);
+   	server_addr.sin_family  = AF_INET;
+   	char *endptr;
+    long int puerto = strtol(obtenerPuerto(), &endptr, 10);
+    if (*endptr != '\0') {
+        // Error: La cadena no es un número válido
+        printf("Error: La cadena no es un número válido\n");
+    } else if (puerto < 0 || puerto > UINT32_MAX) {
+        // Error: Puerto fuera de rango
+        printf("Error: Puerto fuera de rango\n");
+    } else {
+        // Conversión exitosa, puerto contiene el valor numérico
+        server_addr.sin_port = htons((int32_t)puerto);
     }
 
-    if(mq_close(q_servidor) == -1){
-        perror("exist: mq_close servidor");
-        res.status = -1;
-        return res.status;
-    }
-	if(mq_close(q_cliente)==-1){
-        perror("exist: mq_close cliente");
-        res.status = -1;
-        return res.status;
-    }
-    if(mq_unlink(queuename)==-1){
-        perror("exist: mq_unlink");
-        res.status = -1;
-        return res.status;
-    }
-    return res.status;
-}*/
+    // se establece la conexión
+   	err = connect(sd, (struct sockaddr *) &server_addr,  sizeof(server_addr));
+	if (err == -1) {
+		printf("Error en connect\n");
+		return -1;
+	}
+    op = htonl(5);
+    int clave = htonl(key);    
+    err = sendMessage(sd, (char *) &op, sizeof(op)); // envía op
+	if (err == -1){
+		printf("Error en envio de op\n");
+        close(sd);
+		return -1;
+	}
+    err = sendMessage(sd, (char *) &clave, sizeof(clave)); // envía op
+	if (err == -1){
+		printf("Error en envio de clave\n");
+        close(sd);
+		return -1;
+	}
+    err = recvMessage(sd, (char *) &res, sizeof(uint32_t));     // recibe la respuesta
+	if (err == -1){
+		printf("Error en recepcion\n");
+        close(sd);
+		return -1;
+	}
+    close(sd);
+    res = ntohl(res);
+    return res;
+}
