@@ -43,10 +43,12 @@ int set_value(List *l, int clave, char *valor1, int N, double *valor2){
     while (aux != NULL) {
         if (aux->clave == clave) {
             printf("Error: Ya existe un elemento con la clave %d\n", clave);
+            pthread_mutex_unlock(&funciones);
             return -1; // Clave duplicada, retorna error
         }
         aux = aux->siguiente;
     }
+    pthread_mutex_unlock(&funciones);
     struct Tupla *ptr;
 
     ptr = (struct Tupla *) malloc(sizeof(struct Tupla));
@@ -61,8 +63,10 @@ int set_value(List *l, int clave, char *valor1, int N, double *valor2){
     for(int i = 0; i < N; i++){
         ptr->valor2[i] = valor2[i];
     }
+    pthread_mutex_lock(&funciones);
     ptr->siguiente = *l;
     *l = ptr;
+    pthread_mutex_unlock(&funciones);
 
 	return 0;
 }
@@ -83,13 +87,15 @@ int printList(List l) {
     return 0;
 }
 
- struct respuesta get_value(List *l, int clave){
-    pthread_mutex_lock(&funciones);
+ struct respuesta get_value(List *l, int clave){ 
     struct respuesta res;
+    pthread_mutex_lock(&funciones);
     if (*l == NULL) {
         perror("La lista está vacía");
         res.status = -1;
+        pthread_mutex_unlock(&funciones);
         return res;
+        
     }
     // Buscar la tupla con la clave especificada
     List aux = *l;
@@ -104,11 +110,13 @@ int printList(List l) {
                 res.valor2[i] = aux->valor2[i];
             }
             res.status = 0;
+            pthread_mutex_unlock(&funciones);
             return res;
         }
         aux = aux->siguiente;
     }
     perror("Se ha intentado acceder a una clave que no existe");
+    pthread_mutex_unlock(&funciones);
     res.status = -1;
     return res;
 
@@ -120,6 +128,7 @@ int modify_value(List *l, int clave, char *valor1, int N, double *valor2){
     
     if (*l == NULL) {
         perror("La lista está vacía");
+        pthread_mutex_unlock(&funciones);
         return -1;
     }
     // Buscar la tupla con la clave especificada
@@ -137,17 +146,18 @@ int modify_value(List *l, int clave, char *valor1, int N, double *valor2){
             for(int i = 0; i < N; i++){
                 aux->valor2[i] = valor2[i];
             }
+            pthread_mutex_unlock(&funciones);
             return 0;
         }
         aux = aux->siguiente;
     }
     perror("Se ha intentado modificar a una clave que no existe");
+    pthread_mutex_unlock(&funciones);
     return -1;
 }
 
 int delete_key(List *l, int key) {
     pthread_mutex_lock(&funciones);
-    
     if (*l == NULL) {
         perror("La lista está vacía");
         return -1;
@@ -165,6 +175,7 @@ int delete_key(List *l, int key) {
     // Si current es NULL, significa que no se encontró la clave
     if (current == NULL) {
         perror("No se ha encontrado la clave");
+        pthread_mutex_unlock(&funciones);
         return -1;
     }
 
@@ -175,7 +186,7 @@ int delete_key(List *l, int key) {
         // El nodo a eliminar está en el medio o al final de la lista
         previous->siguiente = current->siguiente;
     }
-
+    pthread_mutex_unlock(&funciones);
     // Liberar la memoria del nodo eliminado
     free(current->valor2); // Liberar la memoria del arreglo valor2
     free(current->valor1); // Liberar la memoria de la cadena valor1
@@ -184,11 +195,12 @@ int delete_key(List *l, int key) {
 }
 
 int exist(List *l, int clave){
-    pthread_mutex_lock(&funciones);
     int encontrado = 0;
-    
+
+    pthread_mutex_lock(&funciones);
     if (*l == NULL) {
         perror("La lista está vacía");
+        pthread_mutex_unlock(&funciones);
         return -1;
     }
     List aux = *l;
@@ -202,21 +214,26 @@ int exist(List *l, int clave){
     }
     if(encontrado == 0){
         perror("No se encuentra la clave");
+        pthread_mutex_unlock(&funciones);
         return 0;
     }
     else{
+        pthread_mutex_unlock(&funciones);
         return 1;
     }
 }
 
 void atender_peticion(int * s){
+    //Variables para recibir los mensajes
     int32_t  op;
     int32_t clave;
     int32_t  N;
-    char valor1[256];
-    double valor2[32];
+    char valor1[MAXSIZE];
     uint32_t respuesta;
     int sc;
+    struct respuesta respuesta_strc;
+
+    //Copia del socket
     pthread_mutex_lock(&mutex);
     sc = (* (int *)s);
     mensaje_no_copiado = 0;
@@ -230,156 +247,176 @@ void atender_peticion(int * s){
     if (err == -1) {
         printf("Error en recepcion\n");
         close(sc);
-        //res = -1;
+        res = -1;
     }
-    op = ntohl(op);
-    if (err!=-1){
-        if (op == 0){
-        res = init(&lista);
-        }else if (op == 1){
-            err = recvMessage ( sc, (char *) &clave, sizeof(int));   // recibe la operación
-            if (err == -1) {
-                printf("Error en recepcion\n");
-                close(sc);
-                res = -1;
-            }
-            clave = ntohl(clave);
-            err = recvMessage ( sc, (char *) &valor1, sizeof(valor1));   // recibe la operación
-            if (err == -1) {
-                printf("Error en recepcion\n");
-                close(sc);
-                res = -1;
-            }
-            err = recvMessage ( sc, (char *) &N, sizeof(N));   // recibe la operación
-            if (err == -1) {
-                printf("Error en recepcion\n");
-                close(sc);
-                res = -1;
-            }
-            N = ntohl(N);
-            for (int i = 0; i< N; i++){
-                err = recvMessage ( sc, (char *) &valor2[i], sizeof(double));   // recibe la operación
+    else{
+        //Si no hay error al recibir la operación, se procede a recibir los demás datos
+        op = ntohl(op);
+        if (err!=-1){
+            if (op == 0){
+                res = init(&lista);
+            }else if (op == 1){
+                err = recvMessage ( sc, (char *) &clave, sizeof(int));   // recibe la clave
                 if (err == -1) {
                     printf("Error en recepcion\n");
                     close(sc);
                     res = -1;
                 }
-            }
-            res = set_value(&lista, clave, valor1, N, valor2);
-            printList(lista);
-            pthread_mutex_unlock(&funciones);
-        }
-        else if (op == 2){
-            err = recvMessage ( sc, (char *) &clave, sizeof(int));   // recibe la operación
-            if (err == -1) {
-                printf("Error en recepcion\n");
-                close(sc);
-                res = -1;
-            }
-            clave = ntohl(clave);
-            printf("CLAVE %d", clave);
-            struct respuesta res=get_value(&lista, clave);
-            respuesta = htonl(res.status);
-            err = sendMessage(sc, (char *)&respuesta, sizeof(uint32_t));  // envía el resultado
-            if (err == -1) {
-                printf("Error en envio\n");
-            }
-            if(respuesta==0){
-                err = sendMessage(sc, (char *) &res.valor1, sizeof(res.valor1)); // envía op
-                if (err == -1){
-                    printf("Error en envio de valor1\n");
-                }
-                int32_t N = htonl(res.N);
-                err = sendMessage(sc, (char *) &N, sizeof(N)); // envía op
-                if (err == -1){
-                    printf("Error en envio de N\n");
-                }
-                for (int i = 0; i< res.N; i++){
-                        valor2[i] = res.valor2[i];
-                        err = sendMessage(sc, (char *) &valor2[i], sizeof(valor2[i])); // envía op
-                        if (err == -1){
-                            printf("Error en envio de valor2 %d\n", i);
+                //Se convierte la clave a host byte order
+                clave = ntohl(clave);
 
-                }
-                }
-            }
-            pthread_mutex_unlock(&funciones);
-        }
-        else if (op == 3){
-            err = recvMessage ( sc, (char *) &clave, sizeof(int));   // recibe la operación
-            if (err == -1) {
-                printf("Error en recepcion\n");
-                close(sc);
-                res = -1;
-            }
-            clave = ntohl(clave);
-            err = recvMessage ( sc, (char *) &valor1, sizeof(valor1));   // recibe la operación
-            if (err == -1) {
-                printf("Error en recepcion\n");
-                close(sc);
-                res = -1;
-            }
-            err = recvMessage ( sc, (char *) &N, sizeof(N));   // recibe la operación
-            if (err == -1) {
-                printf("Error en recepcion\n");
-                close(sc);
-                res = -1;
-            }
-            N = ntohl(N);
-            for (int i = 0; i< N; i++){
-                err = recvMessage ( sc, (char *) &valor2[i], sizeof(double));   // recibe la operación
+                err = recvMessage ( sc, (char *) &valor1, sizeof(valor1));   // recibe la cadena
                 if (err == -1) {
                     printf("Error en recepcion\n");
                     close(sc);
                     res = -1;
                 }
+
+                err = recvMessage ( sc, (char *) &N, sizeof(N));   // recibe N
+                if (err == -1) {
+                    printf("Error en recepcion\n");
+                    close(sc);
+                    res = -1;
+                }
+                //Se convierte N a host byte order
+                N = ntohl(N);
+
+                //Los elementos del vector se reciben uno a uno
+                double *valor2 = malloc(N * sizeof(double));
+                for (int i = 0; i< N; i++){
+                    err = recvMessage ( sc, (char *) &valor2[i], sizeof(double));   // recibe valor2[i]
+                    if (err == -1) {
+                        printf("Error en recepcion\n");
+                        close(sc);
+                        res = -1;
+                    }
+                }
+                //Se llama a la función set_value
+                res = set_value(&lista, clave, valor1, N, valor2);
+                free(valor2);
             }
-            res = modify_value(&lista, clave, valor1, N, valor2);
-            printList(lista);
-            pthread_mutex_unlock(&funciones);
-        }
-        else if (op == 4){
-            err = recvMessage ( sc, (char *) &clave, sizeof(int));   // recibe la operación
-            if (err == -1) {
-                printf("Error en recepcion\n");
-                close(sc);
+            else if (op == 2){
+                err = recvMessage ( sc, (char *) &clave, sizeof(int));   // recibe la clave
+                if (err == -1) {
+                    printf("Error en recepcion\n");
+                    close(sc);
+                    res = -1;
+                }
+                //Se convierte la clave a host byte order
+                clave = ntohl(clave);
+                
+                //Esta función tiene que devolver los elementos asociados a una clave. Para ello se guardaran en una estructura de respuesta.
+                //Si la función no da ningún error se enviarán todos los datos
+                struct respuesta respuesta_strc = get_value(&lista, clave);
+                res = respuesta_strc.status;
+            }
+            else if (op == 3){
+                err = recvMessage ( sc, (char *) &clave, sizeof(int));   // recibe la clave
+                if (err == -1) {
+                    printf("Error en recepcion\n");
+                    close(sc);
+                   res = -1;
+                }
+                //Se convierte la clave a host byte order
+                clave = ntohl(clave);
+
+                err = recvMessage ( sc, (char *) &valor1, sizeof(valor1));   // recibe la cadena
+                if (err == -1) {
+                    printf("Error en recepcion\n");
+                    close(sc);
+                    res = -1;
+                }
+
+                err = recvMessage ( sc, (char *) &N, sizeof(N));   // recibe N
+                if (err == -1) {
+                    printf("Error en recepcion\n");
+                    close(sc);
+                    res = -1;
+                }
+                //Se convierte la clave a host byte order
+                N = ntohl(N);
+
+                //Se recibe cada elemento del vector uno a uno
+                double *valor2 = malloc(N * sizeof(double));
+                for (int i = 0; i< N; i++){
+                    err = recvMessage ( sc, (char *) &valor2[i], sizeof(double));   // recibe valor2[i]
+                    if (err == -1) {
+                        printf("Error en recepcion\n");
+                        close(sc);
+                        res = -1;
+                    }
+                }
+                //Llama a la función modify_value
+                res = modify_value(&lista, clave, valor1, N, valor2);
+                free(valor2);
+            }
+            else if (op == 4){
+                err = recvMessage ( sc, (char *) &clave, sizeof(int));   // recibe la clave
+                if (err == -1) {
+                    printf("Error en recepcion\n");
+                    close(sc);
+                    res = -1;
+                }
+                //Se convierte la clave a host byte order
+                clave = ntohl(clave);
+
+                //Llama a la función delete_key
+                res = delete_key(&lista, clave);
+                pthread_mutex_unlock(&funciones);
+            }
+            else if (op == 5){
+                err = recvMessage ( sc, (char *) &clave, sizeof(int));   // recibe la clave
+                if (err == -1) {
+                    printf("Error en recepcion\n");
+                    close(sc);
+                    res = -1;
+                }
+                //Se convierte la clave a host byte order
+                clave = ntohl(clave);
+
+                //Llama a la función exist
+                res = exist(&lista, clave);
+            }
+            else{
+                perror("Operacion no valida");
                 res = -1;
             }
-            clave = ntohl(clave);
-            res = delete_key(&lista, clave);
-            printList(lista);
-            pthread_mutex_unlock(&funciones);
-        }
-        else if (op == 5){
-            err = recvMessage ( sc, (char *) &clave, sizeof(int));   // recibe la operación
-            if (err == -1) {
-                printf("Error en recepcion\n");
-                close(sc);
-                res = -1;
-            }
-            clave = ntohl(clave);
-            res = exist(&lista, clave);
-            pthread_mutex_unlock(&funciones);
-        }
-        else{
-            perror("Operacion no valida");
-            res = -1;
         }
     }
-    if (op!=2){
     respuesta = htonl(res);
-    printf("%d",res);
     err = sendMessage(sc, (char *)&respuesta, sizeof(uint32_t));  // envía el resultado
     if (err == -1) {
         printf("Error en envio\n");
         close(sc);
     }
-    }
+    
+    if(res==0 && op ==2){
+        //Si la función de get_value no ha dado error, es decir, se ha encontrado el elemento asociado a la clave se tienen que enviar el resto de valores.
+        //Sino, no se enviarán más valores y el cliente no deberá esperar más valores.
+        err = sendMessage(sc, (char *) &respuesta_strc.valor1, sizeof(respuesta_strc.valor1)); // envía la cadena
+        if (err == -1){
+            printf("Error en envio de valor1\n");
+        }
+        
+        int32_t N = htonl(respuesta_strc.N);
+        err = sendMessage(sc, (char *) &N, sizeof(N)); // envía N
+        if (err == -1){
+            printf("Error en envio de N\n");
+        }
+        //Se envía el vector valor por valor
+        for (int i = 0; i< respuesta_strc.N; i++){
+            err = sendMessage(sc, (char *) &respuesta_strc.valor2[i], sizeof(respuesta_strc.valor2[i])); // envía valor2[i]
+            if (err == -1){
+                printf("Error en envio de valor2 %d\n", i);
+            }
+        }   
+    
     pthread_exit(NULL);
+    }
 }
 
 int main(int argc, char *argv[]){
-
+    //Verificar los argumentos
     if (argc!=2){
         perror("Error en los argumentos");
         return -1;
@@ -387,7 +424,6 @@ int main(int argc, char *argv[]){
 
     pthread_t hilo;
     pthread_attr_t t_attr;		// atributos de los threads
-
     pthread_mutex_init(&mutex, NULL);
     pthread_mutex_init(&funciones, NULL);
     pthread_cond_init(&cond, NULL);
@@ -396,23 +432,24 @@ int main(int argc, char *argv[]){
 	//atributos de los threads, threads independientes
 	pthread_attr_setdetachstate(&t_attr, PTHREAD_CREATE_DETACHED);
 
+    //Variables para los sockets
     struct sockaddr_in server_addr, client_addr;
     socklen_t size;
-    int sd, sc;
-    int val;
+    int sd, sc; //El socket principal es sd y el socket de conexión es sc
 
+    //Creación del socket TCP
     if ((sd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("Error en el socket");
         return 0;
     }
-
-    val = 1;
+    //COnfiguración del socket
+    int val = 1;
     setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (char *)&val, sizeof(int));
-
     bzero((char *)&server_addr, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
+    //Obtener el puerto. Se utiliza la función strtol para convertir el argumento de puerto a un número y manejar errores
     char *endptr;
     uint32_t puerto;
     long port_arg = strtol(argv[1], &endptr, 10);
@@ -422,16 +459,16 @@ int main(int argc, char *argv[]){
         fprintf(stderr, "El argumento de puerto no es un número válido.\n");
         return -1;
     }
-
     server_addr.sin_port = htons(puerto);
 
-    err = bind(sd, (const struct sockaddr *)&server_addr,
-			sizeof(server_addr));
+    //Asocia la dirección al socket
+    err = bind(sd, (const struct sockaddr *)&server_addr,sizeof(server_addr));
 	if (err == -1) {
 		printf("Error en bind\n");
 		return -1;
 	}
 
+    //Escucha en el socket
     err = listen(sd, SOMAXCONN);
 	if (err == -1) {
 		printf("Error en listen\n");
@@ -441,24 +478,24 @@ int main(int argc, char *argv[]){
     size = sizeof(client_addr);
 
     while(1) {
-
+        //Bucle para aceptar conexiones
         printf("esperando conexion\n");
-    	sc = accept(sd, (struct sockaddr *)&client_addr, (socklen_t *)&size);
-        printf("conexión aceptada de IP: %s   Puerto: %d\n",
-		inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
-		if (sc == -1) {
+        //Cada vez que llega una nueva petición y se acepta, se crea un nuevo socket
+    	sc = accept(sd, (struct sockaddr *)&client_addr, (socklen_t *)&size);
+        if (sc == -1) {
 			printf("Error en accept\n");
 			return -1;
-		}        
+		} 
+        printf("conexión aceptada de IP: %s   Puerto: %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
+        //Servidor bajo demanda. Cada petición se atiende en un hilo diferente
         if(pthread_create(&hilo, &t_attr, (void *)atender_peticion, (int *) &sc) == 0){
             pthread_mutex_lock(&mutex);
 			while (mensaje_no_copiado)
 				pthread_cond_wait(&cond, &mutex);
 			mensaje_no_copiado = 1;
 			pthread_mutex_unlock(&mutex);
-
         }
         else{
             perror("error creación de hilo");
