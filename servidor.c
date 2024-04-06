@@ -187,7 +187,7 @@ int delete_key(List *l, int key) {
 
     // Si current es NULL, significa que no se encontró la clave
     if (current == NULL) {
-        perror("-------------No se ha encontrado la clave para eliminar---------------\n");
+        perror("--------No se ha encontrado la clave para eliminar---------\n");
         printf("\n\n"); // Agregar una línea en blanco
         pthread_mutex_unlock(&funciones);
         return -1;
@@ -504,7 +504,6 @@ int main(int argc, char *argv[]){
 			printf("Error en accept\n");
 			return -1;
 		} 
-        printf("Conexión aceptada de IP: %s   Puerto: %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
         //Servidor bajo demanda. Cada petición se atiende en un hilo diferente
         if(pthread_create(&hilo, &t_attr, (void *)atender_peticion, (int *) &sc) == 0){

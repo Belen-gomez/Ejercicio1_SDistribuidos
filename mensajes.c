@@ -4,7 +4,8 @@
 #include <errno.h>
 #include "mensajes.h"
 
-
+static char *ip_tuplas = NULL;
+static char *port_tuplas = NULL;
 
 int obtenerVariablesEntorno()
 {

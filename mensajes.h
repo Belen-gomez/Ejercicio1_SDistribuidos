@@ -15,8 +15,7 @@ int obtenerVariablesEntorno();
 int sendMessage(int socket, char * buffer, int len);
 int recvMessage(int socket, char *buffer, int len);
 
-static char *ip_tuplas = NULL;
-static char *port_tuplas = NULL;
+
 
 struct respuesta{
     int status;
