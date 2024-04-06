@@ -31,6 +31,8 @@ int init(List *l) {
         free(temp);
     }
     *l = NULL;
+    printf("---------------------Lista inicializada--------------------\n");
+    printf("\n\n"); // Agregar una línea en blanco
     pthread_mutex_unlock(&funciones);
     return 0;
 }
@@ -42,7 +44,8 @@ int set_value(List *l, int clave, char *valor1, int N, double *valor2){
     List aux = *l;
     while (aux != NULL) {
         if (aux->clave == clave) {
-            printf("Error: Ya existe un elemento con la clave %d\n", clave);
+            printf("----Error: Ya existe un elemento con la clave %d. No se puede insertar----\n", clave);
+            printf("\n\n"); // Agregar una línea en blanco
             pthread_mutex_unlock(&funciones);
             return -1; // Clave duplicada, retorna error
         }
@@ -66,6 +69,8 @@ int set_value(List *l, int clave, char *valor1, int N, double *valor2){
     pthread_mutex_lock(&funciones);
     ptr->siguiente = *l;
     *l = ptr;
+    printf("------------Tupla de clave %d insertada------------\n", clave);
+    printList(*l);
     pthread_mutex_unlock(&funciones);
 
 	return 0;
@@ -73,7 +78,6 @@ int set_value(List *l, int clave, char *valor1, int N, double *valor2){
 
 int printList(List l) {
     List aux = l;
-    printf("Imprimir\n");
     while(aux != NULL){
         printf("Nueva tupla\n");
         printf("Clave=%d    value1=%s   N=%d\n", aux->clave, aux->valor1, aux->N);
@@ -91,7 +95,8 @@ int printList(List l) {
     struct respuesta res;
     pthread_mutex_lock(&funciones);
     if (*l == NULL) {
-        perror("La lista está vacía");
+        perror("--------------Get_value. La lista está vacía----------------\n");
+        printf("\n\n"); // Agregar una línea en blanco
         res.status = -1;
         pthread_mutex_unlock(&funciones);
         return res;
@@ -110,12 +115,15 @@ int printList(List l) {
                 res.valor2[i] = aux->valor2[i];
             }
             res.status = 0;
+            printf("------------Tupla de clave %d encontrada------------\n", clave);
+            printf("\n\n"); // Agregar una línea en blanco
             pthread_mutex_unlock(&funciones);
             return res;
         }
         aux = aux->siguiente;
     }
-    perror("Se ha intentado acceder a una clave que no existe");
+    perror("------------Se ha intentado acceder a una clave que no existe (get_value)--------\n");
+    printf("\n\n"); // Agregar una línea en blanco
     pthread_mutex_unlock(&funciones);
     res.status = -1;
     return res;
@@ -127,7 +135,8 @@ int modify_value(List *l, int clave, char *valor1, int N, double *valor2){
     pthread_mutex_lock(&funciones);
     
     if (*l == NULL) {
-        perror("La lista está vacía");
+        perror("------------La lista está vacía. Modify_value--------------\n");
+        printf("\n\n"); // Agregar una línea en blanco
         pthread_mutex_unlock(&funciones);
         return -1;
     }
@@ -146,12 +155,15 @@ int modify_value(List *l, int clave, char *valor1, int N, double *valor2){
             for(int i = 0; i < N; i++){
                 aux->valor2[i] = valor2[i];
             }
+            printf("------------Tupla de clave %d modificada------------\n", clave);
+            printList(*l);
             pthread_mutex_unlock(&funciones);
             return 0;
         }
         aux = aux->siguiente;
     }
-    perror("Se ha intentado modificar a una clave que no existe");
+    perror("--------------Se ha intentado modificar a una clave que no existe (modify_value)----------------\n");
+    printf("\n\n"); // Agregar una línea en blanco
     pthread_mutex_unlock(&funciones);
     return -1;
 }
@@ -159,7 +171,8 @@ int modify_value(List *l, int clave, char *valor1, int N, double *valor2){
 int delete_key(List *l, int key) {
     pthread_mutex_lock(&funciones);
     if (*l == NULL) {
-        perror("La lista está vacía");
+        perror("-------------La lista está vacía (delete_key)--------------------\n");
+        printf("\n\n"); // Agregar una línea en blanco
         return -1;
     }
 
@@ -174,7 +187,8 @@ int delete_key(List *l, int key) {
 
     // Si current es NULL, significa que no se encontró la clave
     if (current == NULL) {
-        perror("No se ha encontrado la clave");
+        perror("-------------No se ha encontrado la clave para eliminar---------------\n");
+        printf("\n\n"); // Agregar una línea en blanco
         pthread_mutex_unlock(&funciones);
         return -1;
     }
@@ -186,6 +200,8 @@ int delete_key(List *l, int key) {
         // El nodo a eliminar está en el medio o al final de la lista
         previous->siguiente = current->siguiente;
     }
+    printf("------------Tupla de clave %d eliminada------------\n", key);
+    printList(*l);
     pthread_mutex_unlock(&funciones);
     // Liberar la memoria del nodo eliminado
     free(current->valor2); // Liberar la memoria del arreglo valor2
@@ -199,7 +215,8 @@ int exist(List *l, int clave){
 
     pthread_mutex_lock(&funciones);
     if (*l == NULL) {
-        perror("La lista está vacía");
+        perror("--------------La lista está vacía. Exixts----------------\n");
+        printf("\n\n"); // Agregar una línea en blanco
         pthread_mutex_unlock(&funciones);
         return -1;
     }
@@ -213,11 +230,14 @@ int exist(List *l, int clave){
         
     }
     if(encontrado == 0){
-        perror("No se encuentra la clave");
+        printf("----------------La clave %d no existe----------------\n", clave);
+        printf("\n\n"); // Agregar una línea en blanco
         pthread_mutex_unlock(&funciones);
         return 0;
     }
     else{
+        printf("----------------La clave %d existe----------------\n", clave);
+        printf("\n\n"); // Agregar una línea en blanco
         pthread_mutex_unlock(&funciones);
         return 1;
     }
@@ -478,16 +498,13 @@ int main(int argc, char *argv[]){
     size = sizeof(client_addr);
 
     while(1) {
-        //Bucle para aceptar conexiones
-        printf("esperando conexion\n");
-
         //Cada vez que llega una nueva petición y se acepta, se crea un nuevo socket
     	sc = accept(sd, (struct sockaddr *)&client_addr, (socklen_t *)&size);
         if (sc == -1) {
 			printf("Error en accept\n");
 			return -1;
 		} 
-        printf("conexión aceptada de IP: %s   Puerto: %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+        printf("Conexión aceptada de IP: %s   Puerto: %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
         //Servidor bajo demanda. Cada petición se atiende en un hilo diferente
         if(pthread_create(&hilo, &t_attr, (void *)atender_peticion, (int *) &sc) == 0){
